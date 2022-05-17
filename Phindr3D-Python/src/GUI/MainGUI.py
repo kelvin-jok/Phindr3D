@@ -17,38 +17,37 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import sys
 
-
-class load_file(QWidget):                           # <===
+class load_file(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Heatmap GUI Help")
-        test_label = QLabel("Files")
-        self.layout = QFormLayout()
-        self.layout.addRow(test_label)
-        self.setLayout(self.layout)
+        self.setWindowTitle("load file")
+        self.resize(500, 200)
 
-class MainGUI():
+        test_label = QLabel("Filler.......")
+        layout = QFormLayout()
+        layout.addRow(test_label)
+        self.setLayout(layout)
+
+        #open window on center of screen
+        frame = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        frame.moveCenter(cp)
+        self.move(frame.topLeft())
+
+class MainGUI(QWidget):
     """Defines the main GUI window of Phindr3D"""
 
     def __init__(self):
         """MainGUI constructor"""
-        self.app = QApplication([])
-        self.foundMetadata = False
-        self.mainWindow = self.buildMainWindow()
+        QMainWindow.__init__(self)
+        super(MainGUI, self).__init__()
 
-    # Function to build main running window
-    def buildMainWindow(self):
-        """Build the window widget and its components"""
-        mainWindow = QMainWindow()
-        mainWindow.setWindowTitle("Phindr3D")
-        #self.app.main_win = QMainWindow()
-        win = QWidget()
-        #self.app.main_win.setCentralWidget(win)
+        self.setWindowTitle("Phindr3D")
+
         layout = QGridLayout()
         layout.setAlignment(Qt.AlignBottom)
-        win.setMinimumSize(0, 0)
-
 
         # All widgets initialized here, to be placed in their proper section of GUI
         loadmeta = QPushButton("Load MetaData")
@@ -70,6 +69,7 @@ class MainGUI():
 
         # Declaring menu actions, to be placed in their proper section of the menubar
         menubar = QMenuBar()
+
         file = menubar.addMenu("File")
         imp = file.addMenu("Import")
         impsession = imp.addAction("Session")
@@ -98,7 +98,7 @@ class MainGUI():
 
         createmetadata.triggered.connect(extractMetadata)
         # Creating and formatting menubar
-        mainWindow.setMenuBar(menubar)
+        layout.addWidget(menubar)
 
         # create analysis parameters box (top left box)
         analysisparam = QGroupBox("Analysis Parameters")
@@ -141,9 +141,10 @@ class MainGUI():
         imgwindow.setLayout(imagelayout)
         imgwindow.setFixedSize(400, 400)
         layout.addWidget(imgwindow, 1, 1, 3, 1)
-        win.setLayout(layout)
-        mainWindow.setCentralWidget(win)
-        return mainWindow
+        self.setLayout(layout)
+
+        #mainGUI buttons clicked
+        loadmeta.clicked.connect(self.file_window_show)
 
     def buildErrorWindow(self, errormessage, icon):
         alert = QMessageBox()
@@ -200,6 +201,7 @@ class MainGUI():
 
         cancel.clicked.connect(win.close)
 
+
         layout.addWidget(imagerootbox, 0, 0, 1, 2)
         layout.addWidget(selectimage, 0, 2, 1, 1)
         layout.addWidget(samplefilebox, 1, 0, 1, 3)
@@ -212,34 +214,22 @@ class MainGUI():
         win.setLayout(layout)
         win.setFixedSize(500, 300)
 
-        #loadmeta.clicked.connect(self.file_window_show)
-        #self.app.aboutToQuit.connect(self.close_windows)
-        #win.closeEvent.connect(self.close_windows)
         return win
-
-
 
     def file_window_show(self):
         self.load_file_window = load_file()
         self.load_file_window.show()
 
-    def closeEvent(self):
-        print("closevent")
+    def closeEvent(self, event):
+        print("closed all windows")
         for window in QApplication.topLevelWidgets():
             window.close()
 
-    def close_windows(self):
-        print("closing")
-        for window in self.app.topLevelWidgets():
-            window.close()
-
-    def run(self):
-        """Show the window and run the application exec method to start the GUI"""
-        self.mainWindow.show()
-        self.app.exec()
-
-        #self.load_file_window.close()
-
-
+def run_mainGUI():
+    """Show the window and run the application exec method to start the GUI"""
+    app = QApplication(sys.argv)
+    window = MainGUI()
+    window.show()
+    app.exec()
 
 # end class MainGUI
