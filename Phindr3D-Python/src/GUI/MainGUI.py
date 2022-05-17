@@ -18,17 +18,30 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QPixmap
 
-class MainGUI:
+
+class load_file(QWidget):                           # <===
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Heatmap GUI Help")
+        test_label = QLabel("Files")
+        self.layout = QFormLayout()
+        self.layout.addRow(test_label)
+        self.setLayout(self.layout)
+
+class MainGUI():
     """Defines the main GUI window of Phindr3D"""
 
     def __init__(self):
         """MainGUI constructor"""
         self.app = QApplication([])
         self.mainWindow = self.buildMainWindow()
+        self.mainWindow.setWindowTitle('Phindr 3D') #window title
 
     def buildMainWindow(self):
         """Build the window widget and its components"""
+        self.app.main_win = QMainWindow()
         win = QWidget()
+        self.app.main_win.setCentralWidget(win)
         layout = QGridLayout()
         layout.setAlignment(Qt.AlignBottom)
         win.setMinimumSize(0, 0)
@@ -86,11 +99,34 @@ class MainGUI:
         imgwindow.setFixedSize(400, 400)
         layout.addWidget(imgwindow, 0, 1, 3, 1)
         win.setLayout(layout)
+
+        loadmeta.clicked.connect(self.file_window_show)
+        self.app.aboutToQuit.connect(self.close_windows)
+        #win.closeEvent.connect(self.close_windows)
         return win
+
+    def file_window_show(self):
+        self.load_file_window = load_file()
+        self.load_file_window.show()
+
+    def closeEvent(self):
+        print("closevent")
+        for window in QApplication.topLevelWidgets():
+            window.close()
+
+    def close_windows(self):
+        print("closing")
+        for window in self.app.topLevelWidgets():
+            window.close()
 
     def run(self):
         """Show the window and run the application exec method to start the GUI"""
-        self.mainWindow.show()
+        #self.mainWindow.show()
+        self.app.main_win.show()
         self.app.exec()
+
+        #self.load_file_window.close()
+
+
 
 # end class MainGUI
