@@ -17,6 +17,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import pyqtgraph as pg
 import sys
 
 class load_file(QWidget):
@@ -43,6 +44,7 @@ class MainGUI(QWidget):
         """MainGUI constructor"""
         QMainWindow.__init__(self)
         super(MainGUI, self).__init__()
+        self.foundMetadata = False
 
         self.setWindowTitle("Phindr3D")
 
@@ -54,9 +56,11 @@ class MainGUI(QWidget):
         setvoxel = QPushButton("Set Voxel Parameters")
         sv = QCheckBox("SV")
         mv = QCheckBox("MV")
-        adjust = QLabel("Adjust Image Threshold") # placeholder for now
+        adjust = QLabel("Adjust Image Threshold")
+        adjustbar = QScrollBar(Qt.Horizontal)
         setcolors = QPushButton("Set Channel Colors")
-        slicescroll = QLabel("Slice Scroller") # placeholder for now
+        slicescroll = QLabel("Slice Scroller")
+        slicescrollbar = QScrollBar(Qt.Horizontal)
         nextimage = QPushButton("Next Image")
         phind = QPushButton("Phind")
         # Button behaviour defined here
@@ -64,8 +68,23 @@ class MainGUI(QWidget):
             if not self.foundMetadata:
                 alert = self.buildErrorWindow("Metadata not found!!", QMessageBox.Critical)
                 alert.exec()
-        # Currently, only error messages will appear, for set voxel button
+
+        def exportError():
+            if not self.foundMetadata:
+                alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
+                alert.exec()
+        # metadataError will check if there is metadata. If there is not, create error message.
+        # Otherwise, execute button behaviour, depending on button (pass extra parameter to
+        # distinguish which button was pressed into metadataError()?)
         setvoxel.clicked.connect(metadataError)
+        sv.clicked.connect(metadataError)
+        mv.clicked.connect(metadataError)
+        adjustbar.valueChanged.connect(metadataError)
+        setcolors.clicked.connect(metadataError)
+        slicescrollbar.valueChanged.connect(metadataError)
+        nextimage.clicked.connect(metadataError)
+        phind.clicked.connect(metadataError)
+
 
         # Declaring menu actions, to be placed in their proper section of the menubar
         menubar = QMenuBar()
@@ -96,9 +115,19 @@ class MainGUI(QWidget):
             winz.show()
             winz.exec()
 
+        def viewResults():
+            winc = self.buildResultsWindow()
+            winc.show()
+            winc.exec()
+
         createmetadata.triggered.connect(extractMetadata)
+        viewresults.triggered.connect(viewResults)
+        imagetabnext.triggered.connect(metadataError)
+        imagetabcolors.triggered.connect(metadataError)
+        expsessions.triggered.connect(exportError)
+        expparameters.triggered.connect(exportError)
         # Creating and formatting menubar
-        layout.addWidget(menubar)
+        layout.setMenuBar(menubar)
 
         # create analysis parameters box (top left box)
         analysisparam = QGroupBox("Analysis Parameters")
@@ -109,8 +138,9 @@ class MainGUI(QWidget):
         grid.addWidget(sv, 2, 0)
         grid.addWidget(mv, 2, 1)
         grid.addWidget(adjust, 3, 0, 1, 2)
+        grid.addWidget(adjustbar, 4, 0, 1, 2)
         analysisparam.setLayout(grid)
-        analysisparam.setFixedSize(140, 180)
+        analysisparam.setFixedSize(140, 200)
         layout.addWidget(analysisparam, 1, 0)
 
         # create image viewing parameters box (bottom left box)
@@ -119,9 +149,10 @@ class MainGUI(QWidget):
         vertical = QVBoxLayout()
         vertical.addWidget(setcolors)
         vertical.addWidget(slicescroll)
+        vertical.addWidget(slicescrollbar)
         vertical.addWidget(nextimage)
         imageparam.setLayout(vertical)
-        imageparam.setFixedSize(140, 180)
+        imageparam.setFixedSize(140, 150)
         layout.addWidget(imageparam, 2, 0)
 
         # Phind button
@@ -214,6 +245,64 @@ class MainGUI(QWidget):
         win.setLayout(layout)
         win.setFixedSize(500, 300)
 
+        return win
+
+    def buildResultsWindow(self):
+        win = QDialog()
+
+        menubar = QMenuBar()
+        file = menubar.addMenu("File")
+        inputfile = file.addAction("Input Feature File")
+        data = menubar.addMenu("Data Analysis")
+        classification = data.addMenu("Classification")
+        selectclasses = classification.addAction("Select Classes")
+        clustering = data.addMenu("Clustering")
+        estimate = clustering.addAction("Estimate Clusters")
+        setnumber = clustering.addAction("Set Number of Clusters")
+        piemaps = clustering.addAction("Pie Maps")
+        export = clustering.addAction("Export Cluster Results")
+        plotproperties = menubar.addMenu("Plot Properties")
+        rotation = plotproperties.addAction("3D Rotation")
+        resetview = plotproperties.addAction("Reset Plot View")
+
+        # menu features go here
+
+        # defining widgets
+        box = QGroupBox()
+        boxlayout = QGridLayout()
+        selectfile = QPushButton("Select Feature File")
+        typedropdown = QComboBox()
+        typedropdown.addItem("PCA")
+        typedropdown.addItem("t-SNE")
+        typedropdown.addItem("Sammon")
+        twod = QCheckBox("2D")
+        threed = QCheckBox("3D")
+        dimensionbox = QGroupBox()
+        dimensionboxlayout = QHBoxLayout()
+        dimensionboxlayout.addWidget(twod)
+        dimensionboxlayout.addWidget(threed)
+        dimensionbox.setLayout(dimensionboxlayout)
+        colordropdown = QComboBox()
+        boxlayout.addWidget(selectfile, 0, 0, 3, 1)
+        boxlayout.addWidget(QLabel("Plot Type"), 0, 1, 1, 1)
+        boxlayout.addWidget(typedropdown, 1, 1, 1, 1)
+        boxlayout.addWidget(dimensionbox, 2, 1, 1, 1)
+        boxlayout.addWidget(QLabel("Color By"), 0, 2, 1, 1)
+        boxlayout.addWidget(colordropdown, 1, 2, 1, 1)
+        box.setLayout(boxlayout)
+
+        # button features go here
+
+        # building layout
+        layout = QGridLayout()
+        plotwindow = pg.plot()
+        scatter = pg.ScatterPlotItem(size=10)
+        plotwindow.addItem(scatter)
+        layout.addWidget(plotwindow, 0, 0, 1, 1)
+        layout.addWidget(box, 1, 0, 1, 1)
+        plotwindow.setBackground('w')
+        layout.setMenuBar(menubar)
+        win.setLayout(layout)
         return win
 
     def file_window_show(self):
