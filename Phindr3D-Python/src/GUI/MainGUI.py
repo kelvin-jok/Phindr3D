@@ -57,34 +57,40 @@ class MainGUI(QWidget):
         sv = QCheckBox("SV")
         mv = QCheckBox("MV")
         adjust = QLabel("Adjust Image Threshold")
-        adjustbar = QScrollBar(Qt.Horizontal)
+        adjustbar = QSlider(Qt.Horizontal)
         setcolors = QPushButton("Set Channel Colors")
         slicescroll = QLabel("Slice Scroller")
-        slicescrollbar = QScrollBar(Qt.Horizontal)
+        slicescrollbar = QSlider(Qt.Horizontal)
         nextimage = QPushButton("Next Image")
         phind = QPushButton("Phind")
         # Button behaviour defined here
-        def metadataError():
+        def metadataError(buttonPressed):
             if not self.foundMetadata:
                 alert = self.buildErrorWindow("Metadata not found!!", QMessageBox.Critical)
                 alert.exec()
+            elif buttonPressed == "Set Voxel Parameters":
+                winp = self.buildParamWindow()
+                winp.show()
+                winp.exec()
 
         def exportError():
             if not self.foundMetadata:
                 alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
                 alert.exec()
+
         # metadataError will check if there is metadata. If there is not, create error message.
         # Otherwise, execute button behaviour, depending on button (pass extra parameter to
         # distinguish which button was pressed into metadataError()?)
-        setvoxel.clicked.connect(metadataError)
-        sv.clicked.connect(metadataError)
-        mv.clicked.connect(metadataError)
-        adjustbar.valueChanged.connect(metadataError)
-        setcolors.clicked.connect(metadataError)
-        slicescrollbar.valueChanged.connect(metadataError)
-        nextimage.clicked.connect(metadataError)
-        phind.clicked.connect(metadataError)
-
+        setvoxel.clicked.connect(lambda: metadataError("Set Voxel Parameters"))
+        sv.clicked.connect(lambda: metadataError("SV"))
+        mv.clicked.connect(lambda: metadataError("MV"))
+        adjustbar.valueChanged.connect(lambda: metadataError("Adjust Image Threshold"))
+        setcolors.clicked.connect(lambda: metadataError("Set Channel Colors"))
+        slicescrollbar.valueChanged.connect(lambda: metadataError("Slice Scroll"))
+        nextimage.clicked.connect(lambda: metadataError("Next Image"))
+        phind.clicked.connect(lambda: metadataError("Phind"))
+        # QScrollBar.valueChanged signal weird, one tap would cause the signal to repeat itself
+        # multiple times, until slider reached one end. Thus, changed QScrollBar to QSlider.
 
         # Declaring menu actions, to be placed in their proper section of the menubar
         menubar = QMenuBar()
@@ -109,6 +115,11 @@ class MainGUI(QWidget):
 
         about = menubar.addAction("About")
 
+        # Testing purposes
+        test = menubar.addMenu("Test")
+        switchmeta = test.addAction("Switch Metadata")
+        switchmeta.setCheckable(True)
+
         # Menu actions defined here
         def extractMetadata():
             winz = self.buildExtractWindow()
@@ -120,12 +131,19 @@ class MainGUI(QWidget):
             winc.show()
             winc.exec()
 
+        # Function purely for testing purposes, this function will switch 'foundMetadata' to true or false
+        def testMetadata():
+            self.foundMetadata = not self.foundMetadata
+
         createmetadata.triggered.connect(extractMetadata)
         viewresults.triggered.connect(viewResults)
         imagetabnext.triggered.connect(metadataError)
         imagetabcolors.triggered.connect(metadataError)
         expsessions.triggered.connect(exportError)
         expparameters.triggered.connect(exportError)
+        about.triggered.connect(self.aboutAlert)
+
+        switchmeta.triggered.connect(testMetadata)
         # Creating and formatting menubar
         layout.setMenuBar(menubar)
 
@@ -140,7 +158,6 @@ class MainGUI(QWidget):
         grid.addWidget(adjust, 3, 0, 1, 2)
         grid.addWidget(adjustbar, 4, 0, 1, 2)
         analysisparam.setLayout(grid)
-        analysisparam.setFixedSize(140, 200)
         layout.addWidget(analysisparam, 1, 0)
 
         # create image viewing parameters box (bottom left box)
@@ -152,8 +169,11 @@ class MainGUI(QWidget):
         vertical.addWidget(slicescrollbar)
         vertical.addWidget(nextimage)
         imageparam.setLayout(vertical)
-        imageparam.setFixedSize(140, 150)
         layout.addWidget(imageparam, 2, 0)
+
+        imageparam.setFixedSize(imageparam.minimumSizeHint())
+        analysisparam.setFixedSize(analysisparam.minimumSizeHint())
+        analysisparam.setFixedWidth(imageparam.minimumWidth())
 
         # Phind button
         layout.addWidget(phind, 3, 0, Qt.AlignCenter)
@@ -164,13 +184,12 @@ class MainGUI(QWidget):
         img = QLabel()
         # Set image to whatever needs to be displayed (temporarily set as icon for testing purposes)
         pixmap = QPixmap('C:\Program Files\Git\Phindr3D\phindr3d_icon.png')
-
-        pixmap = pixmap.scaled(400, 400)
+        imgdimension = imageparam.height() + analysisparam.height()
+        pixmap = pixmap.scaled(imgdimension, imgdimension)
         img.setPixmap(pixmap)
         imagelayout = QVBoxLayout()
         imagelayout.addWidget(img)
         imgwindow.setLayout(imagelayout)
-        imgwindow.setFixedSize(400, 400)
         layout.addWidget(imgwindow, 1, 1, 3, 1)
         self.setLayout(layout)
 
@@ -179,6 +198,7 @@ class MainGUI(QWidget):
 
     def buildErrorWindow(self, errormessage, icon):
         alert = QMessageBox()
+        alert.setWindowTitle("Error Dialog")
         alert.setText(errormessage)
         alert.setIcon(icon)
         return alert
@@ -198,14 +218,15 @@ class MainGUI(QWidget):
         imagerootbox.setFont(largetext)
 
         selectimage = QPushButton("Select Image Directory")
-        selectimage.setFixedSize(130, 30)
+        selectimage.setFixedSize(selectimage.minimumSizeHint())
+        selectimage.setFixedHeight(40)
 
         samplefilebox = QTextEdit()
         samplefilebox.setReadOnly(True)
         samplefilebox.setText(samplefilename)
         samplefilebox.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         samplefilebox.setFont(largetext)
-        samplefilebox.setFixedSize(450, 40)
+        samplefilebox.setFixedSize(450, 30)
 
         expressionbox = QLineEdit()
         expressionbox.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
@@ -214,19 +235,22 @@ class MainGUI(QWidget):
         expressionbox.setPlaceholderText("Type Regular Expression Here")
 
         evaluateexpression = QPushButton("Evaluate Regular Expression")
-        evaluateexpression.setFixedSize(160, 30)
+        evaluateexpression.setFixedSize(evaluateexpression.minimumSizeHint())
+        evaluateexpression.setFixedHeight(30)
 
         outputfilebox = QLineEdit()
         outputfilebox.setAlignment(Qt.AlignCenter)
         outputfilebox.setFont(largetext)
-        outputfilebox.setFixedSize(200, 30)
         outputfilebox.setPlaceholderText("Output Metadata File Name")
+        outputfilebox.setFixedSize(200, 30)
 
         createfile = QPushButton("Create File")
-        createfile.setFixedSize(100, 30)
+        createfile.setFixedSize(createfile.minimumSizeHint())
+        createfile.setFixedHeight(30)
 
         cancel = QPushButton("Cancel")
-        cancel.setFixedSize(100, 30)
+        cancel.setFixedSize(cancel.minimumSizeHint())
+        cancel.setFixedHeight(30)
 
         # button functions
 
@@ -243,13 +267,13 @@ class MainGUI(QWidget):
         layout.addWidget(cancel, 4, 2, 1, 1)
         layout.setSpacing(10)
         win.setLayout(layout)
-        win.setFixedSize(500, 300)
+        win.setFixedSize(win.minimumSizeHint())
 
         return win
 
     def buildResultsWindow(self):
         win = QDialog()
-
+        win.setWindowTitle("Results")
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -303,6 +327,113 @@ class MainGUI(QWidget):
         plotwindow.setBackground('w')
         layout.setMenuBar(menubar)
         win.setLayout(layout)
+        minsize = win.minimumSizeHint()
+        minsize.setHeight(win.minimumSizeHint().height() + 200)
+        minsize.setWidth(win.minimumSizeHint().width() + 100)
+        win.setFixedSize(minsize)
+        return win
+
+    def aboutAlert(self):
+        alert = QMessageBox()
+        alert.setText("talk about the program")
+        alert.setWindowTitle("About")
+        alert.exec()
+
+    def buildParamWindow(self):
+        win = QDialog()
+        win.setWindowTitle("Set Parameters")
+        winlayout = QGridLayout()
+
+        # super voxel box
+        superbox = QGroupBox()
+        superbox.setLayout(QGridLayout())
+        supersizebox = QGroupBox()
+        supersizebox.setLayout(QGridLayout())
+        superxin = QLineEdit()
+        superyin = QLineEdit()
+        superzin = QLineEdit()
+        superxin.setFixedWidth(30)
+        superyin.setFixedWidth(30)
+        superzin.setFixedWidth(30)
+        supersizebox.layout().addWidget(superxin, 0, 1, 1, 1)
+        supersizebox.layout().addWidget(superyin, 1, 1, 1, 1)
+        supersizebox.layout().addWidget(superzin, 2, 1, 1, 1)
+        supersizebox.layout().addWidget(QLabel("X"), 0, 0, 1, 1)
+        supersizebox.layout().addWidget(QLabel("Y"), 1, 0, 1, 1)
+        supersizebox.layout().addWidget(QLabel("Z"), 2, 0, 1, 1)
+        supersizebox.setTitle("Size")
+        supersizebox.layout().setContentsMargins(20, 10, 20, 20)
+        superbox.setTitle("Super Voxel")
+        svnum = QLineEdit()
+        svnum.setFixedWidth(30)
+        superbox.layout().addWidget(svnum, 1, 1, 1, 1)
+        superbox.layout().addWidget(QLabel("#SV\n Categories"), 1, 0, 1, 1)
+        superbox.layout().addWidget(supersizebox, 0, 0, 1, 2)
+        superbox.setFixedWidth(superbox.minimumSizeHint().width() + 20)
+        superbox.setFixedHeight(superbox.minimumSizeHint().height() + 20)
+
+        # mega voxel box
+        megabox = QGroupBox()
+        megabox.setLayout(QGridLayout())
+        megasizebox = QGroupBox()
+        megasizebox.setLayout(QGridLayout())
+        megaxin = QLineEdit()
+        megayin = QLineEdit()
+        megazin = QLineEdit()
+        megaxin.setFixedWidth(30)
+        megayin.setFixedWidth(30)
+        megazin.setFixedWidth(30)
+        megasizebox.layout().addWidget(megaxin, 0, 1, 1, 1)
+        megasizebox.layout().addWidget(megayin, 1, 1, 1, 1)
+        megasizebox.layout().addWidget(megazin, 2, 1, 1, 1)
+        megasizebox.layout().addWidget(QLabel("X"), 0, 0, 1, 1)
+        megasizebox.layout().addWidget(QLabel("Y"), 1, 0, 1, 1)
+        megasizebox.layout().addWidget(QLabel("Z"), 2, 0, 1, 1)
+        megasizebox.setTitle("Size")
+        megasizebox.layout().setContentsMargins(20, 10, 20, 20)
+        megabox.setTitle("Mega Voxel")
+        mvnum = QLineEdit()
+        mvnum.setFixedWidth(30)
+        megabox.layout().addWidget(mvnum, 1, 1, 1, 1)
+        megabox.layout().addWidget(QLabel("#MV\n Categories"), 1, 0, 1, 1)
+        megabox.layout().addWidget(megasizebox, 0, 0, 1, 2)
+        megabox.setFixedSize(superbox.size())
+
+        # main box
+        mainbox = QGroupBox()
+        mainbox.setLayout(QGridLayout())
+        voxelcategories = QLineEdit()
+        voxelcategories.setFixedWidth(30)
+        trainingimages = QLineEdit()
+        trainingimages.setFixedWidth(30)
+        usebackground = QCheckBox("Use Background Voxels for comparing") # text is cutoff, don't know actual line?
+        normalise = QCheckBox("Normalise Intesity\n Per Condition")
+        trainbycondition = QCheckBox("Train by condition")
+        leftdropdown = QComboBox()
+        rightdropdown = QComboBox()
+        mainbox.layout().addWidget(QLabel("#Voxel\nCategories"), 0, 0, 1, 1)
+        mainbox.layout().addWidget(voxelcategories, 0, 1, 1, 1)
+        mainbox.layout().addWidget(QLabel("#Training\nImages"), 0, 3, 1, 1)
+        mainbox.layout().addWidget(trainingimages, 0, 4, 1, 1)
+        mainbox.layout().addWidget(usebackground, 1, 0, 1, 6)
+        mainbox.layout().addWidget(normalise, 2, 0, 1, 3)
+        mainbox.layout().addWidget(trainbycondition, 2, 3, 1, 3)
+        mainbox.layout().addWidget(leftdropdown, 3, 0, 1, 3)
+        mainbox.layout().addWidget(rightdropdown, 3, 3, 1, 3)
+        mainbox.setFixedWidth(mainbox.minimumSizeHint().width() + 50)
+        mainbox.setFixedHeight(mainbox.minimumSizeHint().height() + 20)
+
+        # reset and done buttons
+        reset = QPushButton("Reset")
+        done = QPushButton("Done")
+
+        winlayout.addWidget(superbox, 0, 0, 1, 1)
+        winlayout.addWidget(megabox, 0, 1, 1, 1)
+        winlayout.addWidget(mainbox, 1, 0, 1, 2)
+        winlayout.addWidget(reset, 2, 0, 1, 1)
+        winlayout.addWidget(done, 2, 1, 1, 1)
+        winlayout.setAlignment(Qt.AlignLeft)
+        win.setLayout(winlayout)
         return win
 
     def file_window_show(self):
