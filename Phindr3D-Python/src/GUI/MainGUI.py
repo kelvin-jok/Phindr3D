@@ -13,11 +13,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with src.  If not, see <http://www.gnu.org/licenses/>.
-
+from .external_windows import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-#import pyqtgraph as pg
 import matplotlib
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
@@ -44,56 +43,6 @@ class load_file(QWidget):
         cp = QDesktopWidget().availableGeometry().center()
         frame.moveCenter(cp)
         self.move(frame.topLeft())
-
-#Matplotlib Figure and Interactive Mouse-Click Callback Classes
-class MplCanvas(FigureCanvasQTAgg):
-
-    def __init__(self, parent=None, width=5, height=5, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
-        super(MplCanvas, self).__init__(self.fig)
-
-class interactive_points(object):
-    def __init__(self, xdata, ydata, sc):
-        self.xdata=xdata
-        self.ydata=ydata
-        self.scbounds=sc
-
-    def __call__(self, event):
-
-        #for debugging
-        '''
-        if event.button is MouseButton.LEFT:
-            print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-                      ('double' if event.dblclick else 'single', event.button,
-                       event.x, event.y, event.xdata, event.ydata))
-        '''
-
-        if event.inaxes is not None:
-            #find x & y axis tolerance
-            xlim=self.scbounds.axes.get_xlim()
-            ylim=self.scbounds.axes.get_ylim()
-            xtol=0.015*abs(abs(xlim[0])-abs(xlim[1]))+np.exp(-(abs(abs(xlim[0])-abs(xlim[1]))/500))/50
-            ytol=0.015*abs(abs(ylim[0])-abs(ylim[1]))+np.exp(-(abs(abs(ylim[0])-abs(ylim[1]))/500))/50
-
-            #when clicked locate closest data point
-            pt_closest= distance.cdist([(event.xdata,event.ydata)], list(zip(self.xdata,self.ydata))).argmin()
-            xclose=self.xdata[pt_closest]
-            yclose=self.ydata[pt_closest]
-
-            #create pop-up figure and plot if clicked data point within tolerance
-            plt.figure(1)
-            path = ""
-            if xclose-xtol < event.xdata < xclose+xtol and yclose-ytol < event.ydata < yclose+ytol:
-                path = Image.open('/data' + '/figure_subplots.jpg')
-            if path != "":
-                plt.imshow(path)
-                plt.draw()
-                plt.show()
-                self.load_file_window = load_file()
-                self.load_file_window.show()
-
-
 
 class MainGUI(QWidget):
     """Defines the main GUI window of Phindr3D"""
@@ -382,7 +331,7 @@ class MainGUI(QWidget):
         layout = QGridLayout()
         # setup matplotlib figure
         matplotlib.use('Qt5Agg')
-        # test points
+        # test points. normally empty list x=[], y=[]
         x = [1, 5]
         y = [7, 2]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
@@ -391,11 +340,9 @@ class MainGUI(QWidget):
         main_plot = MplCanvas(self, width=5, height=5, dpi=100)
         sc_plot = main_plot.axes.scatter(x, y)
 
-        # bottom=min(y)
-        # left=min(x)
-
-        # main_plot.axes.set_ylim(bottom=bottom*1.05, top=max(x+y)*1.5)
-        # main_plot.axes.set_xlim(left=left*1.05, right=max(x+y)*1.5)
+        if not x and not y:
+            main_plot.axes.set_ylim(bottom=0)
+            main_plot.axes.set_xlim(left=0)
 
         toolbar = NavigationToolbar(main_plot, self)
         layout.addWidget(toolbar, 0, 0, 1, 1)
