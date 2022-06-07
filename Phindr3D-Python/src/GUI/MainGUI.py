@@ -26,7 +26,6 @@ from scipy.spatial import distance
 import numpy as np
 from PIL import Image
 from .external_windows import *
-import pyqtgraph as pg
 import sys
 
 class load_file(QWidget):

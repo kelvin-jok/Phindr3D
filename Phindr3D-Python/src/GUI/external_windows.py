@@ -30,16 +30,21 @@ import sys
 #Matplotlib Figure and Interactive Mouse-Click Callback Classes
 class MplCanvas(FigureCanvasQTAgg):
 
-    def __init__(self, parent=None, width=5, height=5, dpi=100):
+    def __init__(self, parent=None, width=5, height=5, dpi=100, projection="3d"):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
+        if projection == "3d":
+            self.axes = self.fig.add_subplot(111, projection=projection)
+        else:
+            self.axes = self.fig.add_subplot(111)
         super(MplCanvas, self).__init__(self.fig)
 
 class interactive_points(object):
-    def __init__(self, xdata, ydata, sc):
+    def __init__(self, xdata, ydata, sc, main_plot, projection):
         self.xdata=xdata
         self.ydata=ydata
         self.scbounds=sc
+        self.main_plot=main_plot
+        self.projection=projection
 
         class buildImageViewer(QWidget):
             def __init__(self):
@@ -87,7 +92,7 @@ class interactive_points(object):
                 # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
                 # x=
                 # y=
-                main_plot = MplCanvas(self, width=12, height=12, dpi=100)
+                main_plot = MplCanvas(self, width=12, height=12, dpi=100, projection='2d')
                 main_plot.fig.set_facecolor('#f0f0f0')
                 main_plot.axes.scatter(x, y)
                 main_plot.axes.get_xaxis().set_visible(False)
@@ -138,14 +143,6 @@ class interactive_points(object):
             if xclose-xtol < event.xdata < xclose+xtol and yclose-ytol < event.ydata < yclose+ytol:
                 winc=self.winc
                 winc.show()
-
-                
-                
-                
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
-import pyqtgraph as pg
 
 class extractWindow(QDialog):
     def __init__(self):
@@ -262,13 +259,40 @@ class resultsWindow(QDialog):
 
         # building layout
         layout = QGridLayout()
-        plotwindow = pg.plot()
-        scatter = pg.ScatterPlotItem(size=10)
-        plotwindow.addItem(scatter)
-        layout.addWidget(plotwindow, 0, 0, 1, 1)
-        layout.addWidget(box, 1, 0, 1, 1)
-        plotwindow.setBackground('w')
+        # setup matplotlib figure
+        matplotlib.use('Qt5Agg')
+        # test points. normally empty list x=[], y=[]
+        x = [1, 5]
+        y = [7, 2]
+        # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
+        # x=
+        # y=
+        projection = "2d"  # Temp Modify to radio
+        main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
+        sc_plot = main_plot.axes.scatter(x, y, [4, 9])
+
+        if not x and not y:
+            main_plot.axes.set_ylim(bottom=0)
+            main_plot.axes.set_xlim(left=0)
+
+        toolbar = NavigationToolbar(main_plot, self)
+        layout.addWidget(toolbar, 0, 0, 1, 1)
+        layout.addWidget(main_plot, 1, 0, 1, 1)
+        layout.addWidget(box, 2, 0, 1, 1)
+        img_click = interactive_points(x, y, sc_plot, main_plot, projection)
+        # connect mouse-click to figure
+        cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+        # plotwindow.setBackground('w')
         layout.setMenuBar(menubar)
+        #win.setLayout(layout)
+
+        #plotwindow = pg.plot()
+        #scatter = pg.ScatterPlotItem(size=10)
+        #plotwindow.addItem(scatter)
+        #layout.addWidget(plotwindow, 0, 0, 1, 1)
+        #layout.addWidget(box, 1, 0, 1, 1)
+        #plotwindow.setBackground('w')
+        #layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
         minsize.setHeight(self.minimumSizeHint().height() + 200)
