@@ -282,17 +282,7 @@ class resultsWindow(QDialog):
         img_click = interactive_points(x, y, sc_plot, main_plot, projection)
         # connect mouse-click to figure
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
-        # plotwindow.setBackground('w')
         layout.setMenuBar(menubar)
-        #win.setLayout(layout)
-
-        #plotwindow = pg.plot()
-        #scatter = pg.ScatterPlotItem(size=10)
-        #plotwindow.addItem(scatter)
-        #layout.addWidget(plotwindow, 0, 0, 1, 1)
-        #layout.addWidget(box, 1, 0, 1, 1)
-        #plotwindow.setBackground('w')
-        #layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
         minsize.setHeight(self.minimumSizeHint().height() + 200)
