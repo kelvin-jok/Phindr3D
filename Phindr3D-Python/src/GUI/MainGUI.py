@@ -21,6 +21,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import matplotlib
 import matplotlib.colors as mcolors
+import pandas as pd
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
@@ -32,6 +33,7 @@ from PIL import Image
 import sys
 import os
 from pathlib import Path
+import random
 
 
 class MainGUI(QWidget):
@@ -42,7 +44,7 @@ class MainGUI(QWidget):
         QMainWindow.__init__(self)
         super(MainGUI, self).__init__()
         self.foundMetadata = False
-        self.input_folder=False
+        self.metadata_file=False
         self.setWindowTitle("Phindr3D")
 
         self.image_grid=0
@@ -242,12 +244,17 @@ class MainGUI(QWidget):
     def img_display(self, slicescrollbar, img_plot, sv, mv):
 
         if self.foundMetadata:
-            files = [x for x in os.listdir("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img") if
+            data = pd.read_csv(self.metadata_file, sep="\t")
+            chan_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
+            #files = [x for x in os.listdir("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img") if
                      Path("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img", x).is_file()]
             slicescrollbar.setMinimum(0)
-            slicescrollbar.setMaximum(len(files)/3-1)
+            slicescrollbar.setMaximum((data.shape[0]-1)/(chan_len-1))
             rgb_img=[]
-            for ind, color in zip(range(int(slicescrollbar.value())*3, int(slicescrollbar.value())*3 + 3), [120,8,60]):
+            keys, values = zip(*mcolors.CSS4_COLORS.items())
+            color=random.sample(range(0,len(keys)-1), 3)
+            #for ind, color in zip(range(int(slicescrollbar.value()) * 3, int(slicescrollbar.value()) * 3 + 3),color):
+            for ind, color in zip(range(int(slicescrollbar.value())*chan_len, int(slicescrollbar.value())*chan_len + chan_len), color):
                 cur_img=np.array(Image.open(
                 "/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img/" + files[
                     ind]))
@@ -256,9 +263,8 @@ class MainGUI(QWidget):
                 #print(threshold)
                 np.savetxt("/data/home/kjok/t-sample.txt", np.unique(cur_img))
                 cur_img[cur_img<threshold]=0
-                keys, values = zip(*mcolors.CSS4_COLORS.items())
                 rgb_color=mcolors.to_rgb(values[color])
-                #print(keys[color])
+                print(keys[color])
                 rgb_img.append([[rgb_color if i>0 else (0,0,0) for i in row] for row in cur_img])
 
             self.rgb_img=np.array(rgb_img).transpose(1,2,3,0)
@@ -289,9 +295,9 @@ class MainGUI(QWidget):
         alert.exec()
 
     def file_window_show(self, sv, mv, adjustbar, slicescrollbar, img_plot):
-        self.input_folder = str(QFileDialog.getOpenFileName(self, 'Select tractography file')[0])
-        if self.input_folder and self.input_folder.rsplit('.', 1)[-1]=="txt":
-            print(self.input_folder)
+        self.metadata_file = str(QFileDialog.getOpenFileName(self, 'Select tractography file')[0])
+        if self.metadata_file and self.metadata_file.rsplit('.', 1)[-1]=="txt":
+            print(self.metadata_file)
             self.foundMetadata=True#temp
             adjustbar.setValue(0)
             slicescrollbar.setValue(0)
