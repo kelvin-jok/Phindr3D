@@ -14,8 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with src.  If not, see <http://www.gnu.org/licenses/>.
 
-from skimage import filters
-from scipy.signal import argrelextrema
 from .external_windows import *
 from .analysis_scripts import *
 from PyQt5.QtWidgets import *
@@ -30,6 +28,7 @@ from matplotlib.figure import Figure
 from scipy.spatial import distance
 import numpy as np
 from PIL import Image, ImageColor
+from PIL import Image
 import sys
 import os
 from pathlib import Path
@@ -416,12 +415,16 @@ class MainGUI(QWidget):
         # test points. normally empty list x=[], y=[]
         x = [1, 5]
         y = [7, 2]
+        z = [4,9]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
-        projection="2d" #Temp Modify to radio
+        projection="2d" #get from radiobutton
         main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
-        sc_plot = main_plot.axes.scatter(x, y, [4, 9])
+        if projection=='2d':
+            sc_plot = main_plot.axes.scatter(x, y, s=10, alpha=1)
+        else:
+            sc_plot = main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade = False)
 
         if not x and not y:
             main_plot.axes.set_ylim(bottom=0)
@@ -431,7 +434,7 @@ class MainGUI(QWidget):
         layout.addWidget(toolbar, 0, 0, 1, 1)
         layout.addWidget(main_plot, 1, 0, 1, 1)
         layout.addWidget(box, 2, 0, 1, 1)
-        img_click = interactive_points(x, y, sc_plot, main_plot, projection)
+        img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
         # connect mouse-click to figure
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
         # plotwindow.setBackground('w')
