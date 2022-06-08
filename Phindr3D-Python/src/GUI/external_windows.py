@@ -280,22 +280,27 @@ class resultsWindow(QDialog):
         # test points. normally empty list x=[], y=[]
         x = [1, 5]
         y = [7, 2]
+        z = [4, 9]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
-        projection = "2d"  # Temp Modify to radio
+        projection = "2d"  # get from radiobutton
         main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
-        sc_plot = main_plot.axes.scatter(x, y, [4, 9])
-
-        if not x and not y:
-            main_plot.axes.set_ylim(bottom=0)
-            main_plot.axes.set_xlim(left=0)
+        if projection == '2d':
+            sc_plot = main_plot.axes.scatter(x, y, s=10, alpha=1)
+            if not x and not y:
+                main_plot.axes.set_ylim(bottom=0)
+                main_plot.axes.set_xlim(left=0)
+            else:
+                main_plot.axes.set_aspect('equal', adjustable='datalim')
+        else:
+            sc_plot = main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
 
         toolbar = NavigationToolbar(main_plot, self)
         layout.addWidget(toolbar, 0, 0, 1, 1)
         layout.addWidget(main_plot, 1, 0, 1, 1)
         layout.addWidget(box, 2, 0, 1, 1)
-        img_click = interactive_points(x, y, sc_plot, main_plot, projection)
+        img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
         # connect mouse-click to figure
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
         layout.setMenuBar(menubar)
