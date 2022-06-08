@@ -24,22 +24,28 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 from matplotlib.figure import Figure
 from scipy.spatial import distance
 import numpy as np
+
 from PIL import Image
 import sys
 
 #Matplotlib Figure and Interactive Mouse-Click Callback Classes
 class MplCanvas(FigureCanvasQTAgg):
 
-    def __init__(self, parent=None, width=5, height=5, dpi=100):
+    def __init__(self, parent=None, width=5, height=5, dpi=100, projection="3d"):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
+        if projection=="3d":
+            self.axes = self.fig.add_subplot(111, projection=projection)
+        else:
+            self.axes = self.fig.add_subplot(111)
         super(MplCanvas, self).__init__(self.fig)
 
 class interactive_points(object):
-    def __init__(self, xdata, ydata, sc):
+    def __init__(self, xdata, ydata, sc, main_plot, projection):
         self.xdata=xdata
         self.ydata=ydata
         self.scbounds=sc
+        self.main_plot=main_plot
+        self.projection=projection
 
         class buildImageViewer(QWidget):
             def __init__(self):
@@ -87,7 +93,7 @@ class interactive_points(object):
                 # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
                 # x=
                 # y=
-                main_plot = MplCanvas(self, width=12, height=12, dpi=100)
+                main_plot = MplCanvas(self, width=12, height=12, dpi=100, projection='2d')
                 main_plot.fig.set_facecolor('#f0f0f0')
                 main_plot.axes.scatter(x, y)
                 main_plot.axes.get_xaxis().set_visible(False)
@@ -113,28 +119,48 @@ class interactive_points(object):
     def __call__(self, event):
 
         #for debugging
-        '''
+
         if event.button is MouseButton.LEFT:
             print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
                       ('double' if event.dblclick else 'single', event.button,
                        event.x, event.y, event.xdata, event.ydata))
-        '''
+            if self.projection=='3D':
+                btn_press = self.scbounds.axes.button_pressed
+                # set current mousebutton to something unreasonable
+                self.scbounds.axes.button_pressed = -1
+                xyz_coord=self.scbounds.axes.format_coord(event.xdata, event.ydata)
+                xyz_coord = [float(x.split('=')[1].strip()) for x in xyz_coord.split(',')]
+                print(xyz_coord)
+                self.scbounds.axes.button_pressed=btn_press
 
-        if event.inaxes is not None:
+
+        if event.inaxes is not None and event.button is MouseButton.LEFT:
             #find x & y axis tolerance
             xlim=self.scbounds.axes.get_xlim()
             ylim=self.scbounds.axes.get_ylim()
+            #fix tolerance 3d!
+            print(xlim, ylim)
             xtol=0.015*abs(abs(xlim[0])-abs(xlim[1]))+np.exp(-(abs(abs(xlim[0])-abs(xlim[1]))/500))/50
             ytol=0.015*abs(abs(ylim[0])-abs(ylim[1]))+np.exp(-(abs(abs(ylim[0])-abs(ylim[1]))/500))/50
 
             #when clicked locate closest data point
-            pt_closest= distance.cdist([(event.xdata,event.ydata)], list(zip(self.xdata,self.ydata))).argmin()
+            if self.projection=='2d':
+                pt_closest= distance.cdist([(event.xdata,event.ydata)], list(zip(self.xdata,self.ydata))).argmin()
+            else:
+                pt_closest = distance.cdist([(xyz_coord[0], xyz_coord[1])], list(zip(self.xdata, self.ydata))).argmin()
             xclose=self.xdata[pt_closest]
             yclose=self.ydata[pt_closest]
-
+            print(xclose, yclose)
+            print(xtol, ytol)
             #create pop-up figure and plot if clicked data point within tolerance
             plt.figure(1)
-
-            if xclose-xtol < event.xdata < xclose+xtol and yclose-ytol < event.ydata < yclose+ytol:
-                winc=self.winc
-                winc.show()
+            #circ = matplotlib.patches.Circle((xclose, yclose), 5)#, alpha=0.8, fc='yellow')
+            #self.main_plot.axes.set_aspect('equal', adjustable='datalim')
+            circ=matplotlib.patches.Circle((1,5), 50, color='r', fill=False)
+            self.main_plot.fig.add_artist(circ)
+            self.main_plot.draw()
+            winc=self.winc
+            winc.show()
+            #if xclose-xtol < event.xdata < xclose+xtol and yclose-ytol < event.ydata < yclose+ytol:
+            #    winc=self.winc
+            #    winc.show()

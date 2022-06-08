@@ -13,36 +13,27 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with src.  If not, see <http://www.gnu.org/licenses/>.
+
+from skimage import filters
+from scipy.signal import argrelextrema
 from .external_windows import *
+from .analysis_scripts import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import matplotlib
+import matplotlib.colors as mcolors
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from scipy.spatial import distance
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageColor
 import sys
+import os
+from pathlib import Path
 
-class load_file(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("load file")
-        self.resize(500, 200)
-
-        test_label = QLabel("Filler.......")
-        layout = QFormLayout()
-        layout.addRow(test_label)
-        self.setLayout(layout)
-
-        #open window on center of screen
-        frame = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
-        frame.moveCenter(cp)
-        self.move(frame.topLeft())
 
 class MainGUI(QWidget):
     """Defines the main GUI window of Phindr3D"""
@@ -52,9 +43,11 @@ class MainGUI(QWidget):
         QMainWindow.__init__(self)
         super(MainGUI, self).__init__()
         self.foundMetadata = False
-
+        self.input_folder=False
         self.setWindowTitle("Phindr3D")
 
+        self.image_grid=0
+        self.rgb_img=[]
         layout = QGridLayout()
         layout.setAlignment(Qt.AlignBottom)
 
@@ -63,11 +56,13 @@ class MainGUI(QWidget):
         setvoxel = QPushButton("Set Voxel Parameters")
         sv = QCheckBox("SV")
         mv = QCheckBox("MV")
+
         adjust = QLabel("Adjust Image Threshold")
         adjustbar = QSlider(Qt.Horizontal)
         setcolors = QPushButton("Set Channel Colors")
         slicescroll = QLabel("Slice Scroller")
         slicescrollbar = QSlider(Qt.Horizontal)
+        previmage = QPushButton("Prev Image")
         nextimage = QPushButton("Next Image")
         phind = QPushButton("Phind")
         # Button behaviour defined here
@@ -94,6 +89,7 @@ class MainGUI(QWidget):
         adjustbar.valueChanged.connect(lambda: metadataError("Adjust Image Threshold"))
         setcolors.clicked.connect(lambda: metadataError("Set Channel Colors"))
         slicescrollbar.valueChanged.connect(lambda: metadataError("Slice Scroll"))
+        #slicescrollbar.valueChanged.connect(lambda: metadataError("Slice Scroll"))
         nextimage.clicked.connect(lambda: metadataError("Next Image"))
         phind.clicked.connect(lambda: metadataError("Phind"))
         # QScrollBar.valueChanged signal weird, one tap would cause the signal to repeat itself
@@ -137,7 +133,9 @@ class MainGUI(QWidget):
             winc = self.buildResultsWindow()
             winc.show()
             winc.exec()
-
+        def scroller():
+            metadataError("Slice Scroll")
+            plt.draw()
         # Function purely for testing purposes, this function will switch 'foundMetadata' to true or false
         def testMetadata():
             self.foundMetadata = not self.foundMetadata
@@ -171,11 +169,14 @@ class MainGUI(QWidget):
         # create image viewing parameters box (bottom left box)
         imageparam = QGroupBox("Image Viewing Parameters")
         imageparam.setAlignment(1)
-        vertical = QVBoxLayout()
-        vertical.addWidget(setcolors)
-        vertical.addWidget(slicescroll)
-        vertical.addWidget(slicescrollbar)
-        vertical.addWidget(nextimage)
+        vertical = QFormLayout()
+        vertical.addRow(setcolors)
+        vertical.addRow(slicescroll)
+        vertical.addRow(slicescrollbar)
+        image_selection = QHBoxLayout()
+        image_selection.addWidget(previmage)
+        image_selection.addWidget(nextimage)
+        vertical.addRow(image_selection)
         imageparam.setLayout(vertical)
         imageparam.setFixedSize(140, 180)
         layout.addWidget(imageparam, 2, 0)
@@ -190,21 +191,102 @@ class MainGUI(QWidget):
         # Box for image (?)
         imgwindow = QGroupBox()
         imgwindow.setFlat(True)
+
+        '''
         img = QLabel()
         # Set image to whatever needs to be displayed (temporarily set as icon for testing purposes)
         pixmap = QPixmap('C:\Program Files\Git\Phindr3D\phindr3d_icon.png')
         imgdimension = imageparam.height() + analysisparam.height()
         pixmap = pixmap.scaled(imgdimension, imgdimension)
         img.setPixmap(pixmap)
+        '''
+        matplotlib.use('Qt5Agg')
+
+        img_plot = MplCanvas(self, width=2160*0.0104166667, height=2160*0.0104166667, dpi=300, projection="2d")
+        img_plot.axes.imshow(np.zeros((1000,1000)), cmap = mcolors.ListedColormap("black"))
+        img_plot.fig.set_facecolor("black")
         imagelayout = QVBoxLayout()
-        imagelayout.addWidget(img)
+        imagelayout.addWidget(img_plot)
         imgwindow.setLayout(imagelayout)
         imgwindow.setFixedSize(400, 400)
         layout.addWidget(imgwindow, 1, 1, 3, 1)
         self.setLayout(layout)
 
         #mainGUI buttons clicked
-        loadmeta.clicked.connect(self.file_window_show)
+        loadmeta.clicked.connect(lambda: self.file_window_show(sv, mv, adjustbar, slicescrollbar, img_plot))
+        #if self.foundMetadata:
+        nextimage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())+1))
+        previmage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())-1) if int(slicescrollbar.value())>0 else None)
+        #slicescrollbar.valueChanged.connect(lambda: self.scroll_index(slicescrollbar, img_plot))
+        slicescrollbar.valueChanged.connect(lambda: self.img_display(slicescrollbar, img_plot, sv, mv))
+        #TEMPORARY PARAMS!!!!!
+        class params(object):
+                tileX = 10
+                tileY = 10
+                megaVoxelTileX = 5
+                megaVoxelTileY = 5
+        param=params()
+        sv.stateChanged.connect(lambda : self.overlay_display(img_plot, self.image_grid, param, sv, mv, 'SV'))
+        mv.stateChanged.connect(lambda : self.overlay_display(img_plot, self.image_grid, param, mv, sv, 'MV'))
+
+    def overlay_display(self, img_plot, img_grid, params, checkbox_cur, checkbox_next, type):
+        if self.foundMetadata:
+            img_plot.axes.clear()
+            for i in range(3):
+                alpha = 1
+                if i > 0:
+                    alpha = 0.7
+                img_plot.axes.imshow(self.rgb_img[:, :, :, i], alpha=alpha)
+            if checkbox_cur.isChecked():
+                checkbox_next.setChecked(False)
+                overlay=getImageWithSVMVOverlay(img_grid, params, type)
+                img_plot.axes.imshow(overlay, zorder=5, cmap=mcolors.ListedColormap('#FFFFFF'), alpha=0.5)
+            img_plot.draw()
+    def img_display(self, slicescrollbar, img_plot, sv, mv):
+
+        if self.foundMetadata:
+            files = [x for x in os.listdir("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img") if
+                     Path("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img", x).is_file()]
+            slicescrollbar.setMinimum(0)
+            slicescrollbar.setMaximum(len(files)/3-1)
+            rgb_img=[]
+            for ind, color in zip(range(int(slicescrollbar.value())*3, int(slicescrollbar.value())*3 + 3), [120,8,60]):
+                cur_img=np.array(Image.open(
+                "/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img/" + files[
+                    ind]))
+
+                threshold=getImageThreshold(cur_img)
+                #print(threshold)
+                np.savetxt("/data/home/kjok/t-sample.txt", np.unique(cur_img))
+                cur_img[cur_img<threshold]=0
+                keys, values = zip(*mcolors.CSS4_COLORS.items())
+                rgb_color=mcolors.to_rgb(values[color])
+                #print(keys[color])
+                rgb_img.append([[rgb_color if i>0 else (0,0,0) for i in row] for row in cur_img])
+
+            self.rgb_img=np.array(rgb_img).transpose(1,2,3,0)
+            #print(np.shape(rgb_img))
+            self.image_grid=np.zeros((self.rgb_img.shape[0], self.rgb_img.shape[1], 3))
+            img_plot.axes.clear()
+            for i in range(3):
+                alpha=1
+                if i>0:
+                    alpha=0.7
+                img_plot.axes.imshow(self.rgb_img[:,:,:,i], alpha=alpha)
+            img_plot.axes.set_position([0, 0, 1, 1])
+            img_plot.draw()
+            sv.setChecked(False)
+            mv.setChecked(False)
+    def scroll_index(self, slicescrollbar, img_plot):
+        if self.foundMetadata:
+            files = [x for x in os.listdir("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img") if
+                     Path("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img", x).is_file()]
+            cur_img = np.asarray(Image.open(
+                "/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img/" + files[
+                    int(slicescrollbar.value())]))
+            img_plot.axes.imshow(cur_img)
+            img_plot.axes.set_position([0, 0, 1, 1])
+            img_plot.draw()
 
     def buildErrorWindow(self, errormessage, icon):
         alert = QMessageBox()
@@ -337,8 +419,9 @@ class MainGUI(QWidget):
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
-        main_plot = MplCanvas(self, width=5, height=5, dpi=100)
-        sc_plot = main_plot.axes.scatter(x, y)
+        projection="2d" #Temp Modify to radio
+        main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
+        sc_plot = main_plot.axes.scatter(x, y, [4, 9])
 
         if not x and not y:
             main_plot.axes.set_ylim(bottom=0)
@@ -348,10 +431,9 @@ class MainGUI(QWidget):
         layout.addWidget(toolbar, 0, 0, 1, 1)
         layout.addWidget(main_plot, 1, 0, 1, 1)
         layout.addWidget(box, 2, 0, 1, 1)
-        img_click = interactive_points(x, y, sc_plot)
+        img_click = interactive_points(x, y, sc_plot, main_plot, projection)
         # connect mouse-click to figure
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
-        print(main_plot.fig.artists)
         # plotwindow.setBackground('w')
         layout.setMenuBar(menubar)
         win.setLayout(layout)
@@ -461,9 +543,14 @@ class MainGUI(QWidget):
         win.setLayout(winlayout)
         return win
 
-    def file_window_show(self):
-        self.load_file_window = load_file()
-        self.load_file_window.show()
+    def file_window_show(self, sv, mv, adjustbar, slicescrollbar, img_plot):
+        self.input_folder = str(QFileDialog.getOpenFileName(self, 'Select tractography file')[0])
+        if self.input_folder:
+            print(self.input_folder)
+            self.foundMetadata=True#temp
+            adjustbar.setValue(0)
+            slicescrollbar.setValue(0)
+            self.img_display(slicescrollbar, img_plot, sv, mv)
 
     def closeEvent(self, event):
         print("closed all windows")
