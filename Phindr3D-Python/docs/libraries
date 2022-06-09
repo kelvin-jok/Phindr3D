@@ -8,5 +8,4 @@ List of libraries used:
 - scipy
 - sys
 - pillow
-- os
-- pathlib
+

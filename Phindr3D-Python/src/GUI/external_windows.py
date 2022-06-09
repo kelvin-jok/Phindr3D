@@ -36,7 +36,7 @@ class MplCanvas(FigureCanvasQTAgg):
         if projection=="3d":
             self.axes = self.fig.add_subplot(111, projection=projection)
         else:
-            self.axes = self.fig.add_subplot(111)
+            self.axes = self.fig.add_subplot(111, projection=None)
         super(MplCanvas, self).__init__(self.fig)
 
 class interactive_points(object):
@@ -230,6 +230,9 @@ class resultsWindow(QDialog):
     def __init__(self):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
+
+
+
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -255,8 +258,9 @@ class resultsWindow(QDialog):
         typedropdown.addItem("PCA")
         typedropdown.addItem("t-SNE")
         typedropdown.addItem("Sammon")
-        twod = QCheckBox("2D")
-        threed = QCheckBox("3D")
+        twod = QRadioButton("2D")
+
+        threed = QRadioButton("3D")
         dimensionbox = QGroupBox()
         dimensionboxlayout = QHBoxLayout()
         dimensionboxlayout.addWidget(twod)
@@ -271,21 +275,59 @@ class resultsWindow(QDialog):
         boxlayout.addWidget(colordropdown, 1, 2, 1, 1)
         box.setLayout(boxlayout)
 
-        # button features go here
-
-        # building layout
-        layout = QGridLayout()
-        # setup matplotlib figure
         matplotlib.use('Qt5Agg')
-        # test points. normally empty list x=[], y=[]
+        # test points. normally empty list x=[], y=[], z=[] #temp
         x = [1, 5]
         y = [7, 2]
         z = [4, 9]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
+        self.main_plot=None
+        sc_plot=None
         projection = "2d"  # get from radiobutton
-        main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
+        def check_projection(x, y, z, projection, sc_plot, twod):
+            if twod.isChecked()==True:
+                if projection=="3d":
+                    self.main_plot.close()
+                projection = "2d"
+                self.main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=None)
+                sc_plot = self.main_plot.axes.scatter(x, y, s=10, alpha=1)
+                if not x and not y:
+                    self.main_plot.axes.set_ylim(bottom=0)
+                    self.main_plot.axes.set_xlim(left=0)
+                else:
+                    self.main_plot.axes.set_aspect('equal', adjustable='datalim')
+                self.main_plot.fig.canvas.draw()
+                layout.addWidget(self.main_plot, 1, 0, 1, 1)
+            else:
+                projection="3d"
+                #self.main_plot.axes.clear()
+                #self.main_plot.fig.clf()
+                #self.main_plot.axes.cla()
+                self.main_plot.close()
+                # self.main_plot.axes.cla()
+                #self.main_plot.fig.delaxes(self.main_plot.axes)
+                #del self.main_plot
+                #self.main_plot.fig.clf()
+                self.main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
+                sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
+                self.main_plot.fig.canvas.draw()
+                layout.addWidget(self.main_plot, 1, 0, 1, 1)
+
+        # building layout
+        layout = QGridLayout()
+        # setup matplotlib figure
+
+        #main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
+
+        # button features go here
+        twod.toggled.connect(lambda: check_projection(x, y, z, projection, sc_plot, twod))
+        twod.setChecked(True)
+        img_click = interactive_points(x, y, z, sc_plot, self.main_plot, projection)
+        # connect mouse-click to figure
+        cid = self.main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+        '''
         if projection == '2d':
             sc_plot = main_plot.axes.scatter(x, y, s=10, alpha=1)
             if not x and not y:
@@ -295,14 +337,17 @@ class resultsWindow(QDialog):
                 main_plot.axes.set_aspect('equal', adjustable='datalim')
         else:
             sc_plot = main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
-
-        toolbar = NavigationToolbar(main_plot, self)
-        layout.addWidget(toolbar, 0, 0, 1, 1)
-        layout.addWidget(main_plot, 1, 0, 1, 1)
-        layout.addWidget(box, 2, 0, 1, 1)
         img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
         # connect mouse-click to figure
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+        '''
+        toolbar = NavigationToolbar(self.main_plot, self)
+        layout.addWidget(toolbar, 0, 0, 1, 1)
+        layout.addWidget(self.main_plot, 1, 0, 1, 1)
+        layout.addWidget(box, 2, 0, 1, 1)
+        #img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
+        # connect mouse-click to figure
+        #cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
