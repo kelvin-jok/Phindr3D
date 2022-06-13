@@ -32,11 +32,36 @@ def getImageWithSVMVOverlay(IM, param, type):
     % param.megaVoxelTileX = 5;
     % param.megaVoxelTileY = 5;
     """
+    xOffset = np.mod(IM.shape[0], param.tileX);
+    yOffset = np.mod(IM.shape[1], param.tileY);
+    #zOffset = mod(dimSize(3), param.tileZ);
 
+    param.croppedX = IM.shape[0] - xOffset;
+    param.croppedY = IM.shape[1] - yOffset;
+    #param.croppedZ = dimSize(3) - zOffset;
+
+    superVoxelXOffset = np.mod(param.croppedX/ param.tileX, param.megaVoxelTileX);
+    superVoxelYOffset = np.mod(param.croppedY/ param.tileY, param.megaVoxelTileY);
+    spX = int((param.croppedX/ param.tileX));
+    spY = int((param.croppedY/ param.tileY));
+    tmpX = int((param.croppedX/ param.tileX) + superVoxelXOffset);
+    tmpY = int((param.croppedY/ param.tileY) + superVoxelYOffset);
+    print(tmpX)
+    print(tmpY)
     if type == 'SV':
-        IM[range(0,IM.shape[0],param.tileX), :,:] = 0.7
-        IM[:, range(0,IM.shape[1],param.tileY),:] = 0.7
+        #IM[range(0,IM.shape[0],spX), :,:] = (0.7, 0.7, 0.7, 1.0)
+        #IM[:, range(0,IM.shape[1],spY),:] = (0.7, 0.7, 0.7, 1.0)
+        #IM[range(1, IM.shape[0], spX), :, :] = (0.7, 0.7, 0.7, 1.0)
+        #IM[:, range(1, IM.shape[1], spY), :] = (0.7, 0.7, 0.7, 1.0)
+        IM[range(0,IM.shape[0],param.tileX), :,:] = (0.7, 0.7, 0.7, 1.0)
+        IM[:, range(0,IM.shape[1],param.tileY),:] = (0.7, 0.7, 0.7, 1.0)
+        IM[range(0,IM.shape[0],param.tileX), :,:] = (0.7, 0.7, 0.7, 1.0)
+        IM[:, range(0,IM.shape[1],param.tileY),:] = (0.7, 0.7, 0.7, 1.0)
     else:
-        IM[range(0,IM.shape[0],param.tileX*param.megaVoxelTileX), :,:] = 1
-        IM[:, range(0,IM.shape[1], param.tileY*param.megaVoxelTileY),:] = 1
+        IM[range(0,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
+        IM[:, range(0,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
+        IM[range(1,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
+        IM[:, range(1,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
+        #IM[range(0,IM.shape[0],param.tileX*param.megaVoxelTileX), :,:] = (1.0, 1.0, 1.0, 1.0)
+        #IM[:, range(0,IM.shape[1], param.tileY*param.megaVoxelTileY),:] = (1.0, 1.0, 1.0, 1.0)
     return IM

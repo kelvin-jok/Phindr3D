@@ -31,6 +31,7 @@ import numpy as np
 from PIL import Image, ImageColor
 from PIL import Image
 import sys
+import warnings
 import random
 
 
@@ -60,6 +61,7 @@ class MainGUI(QWidget):
         setcolors = QPushButton("Set Channel Colors")
         slicescroll = QLabel("Slice Scroller")
         slicescrollbar = QSlider(Qt.Horizontal)
+        slicescrollbar.setMinimum(0)
         previmage = QPushButton("Prev Image")
         nextimage = QPushButton("Next Image")
         phind = QPushButton("Phind")
@@ -136,7 +138,6 @@ class MainGUI(QWidget):
         def testMetadata():
             self.metadata_file= not self.metadata_file
 
-
         createmetadata.triggered.connect(extractMetadata)
         viewresults.triggered.connect(viewResults)
         imagetabnext.triggered.connect(metadataError)
@@ -199,14 +200,16 @@ class MainGUI(QWidget):
         '''
         matplotlib.use('Qt5Agg')
 
-        img_plot = MplCanvas(self, width=2160*0.0104166667, height=2160*0.0104166667, dpi=300, projection="2d")
-        img_plot.axes.imshow(np.zeros((1000,1000)), cmap = mcolors.ListedColormap("black"))
+        img_plot = MplCanvas(self, width=2160*0.0104166667, height=2160*0.0104166667, dpi=300, projection="2d") #inches=pixel*0.0104166667
+        img_plot.axes.imshow(np.zeros((2160,2160)), cmap = mcolors.ListedColormap("black"))
         img_plot.fig.set_facecolor("black")
         imagelayout = QVBoxLayout()
         imagelayout.addWidget(img_plot)
         imgwindow.setLayout(imagelayout)
-        imgwindow.setFixedSize(400, 400)
+        imgwindow.setFixedSize(450, 450)
         layout.addWidget(imgwindow, 1, 1, 3, 1)
+        img_plot.axes.set_aspect("auto")
+        img_plot.axes.set_position([0, 0, 1, 1])
         self.setLayout(layout)
 
         #mainGUI buttons clicked
@@ -227,64 +230,102 @@ class MainGUI(QWidget):
         mv.stateChanged.connect(lambda : self.overlay_display(img_plot, self.image_grid, param, mv, sv, 'MV'))
 
     def overlay_display(self, img_plot, img_grid, params, checkbox_cur, checkbox_prev, type):
+        print(type)
         if self.metadata_file:
             img_plot.axes.clear()
-            for i in range(3):
-                alpha = 1.0
-                if i > 0:
-                    alpha = 0.5
-                img_plot.axes.imshow(self.rgb_img[:, :, :, i], alpha=alpha)
-            #img_plot.axes.imshow(np.maximum(self.rgb_img[:, :, :, 0:3]))
-            if checkbox_cur.isChecked():
+            img_plot.axes.imshow(self.rgb_img)
+            if checkbox_cur.isChecked() and checkbox_prev.isChecked():
                 checkbox_prev.setChecked(False)
+            if checkbox_cur.isChecked():
                 overlay=getImageWithSVMVOverlay(img_grid, params, type)
-                img_plot.axes.imshow(overlay, zorder=5, cmap=mcolors.ListedColormap('#FFFFFF'), alpha=0.5)
+                print(overlay)
+                #cmap=mcolors.ListedColormap([None,'#FFFFFF'])
+                cmap=[[0,0,0,0],[255,255,255,1]]
+                newcmp = mcolors.ListedColormap(['#000000', '#FFFFFF'])
+                boundaries = [0.1,1.1]
+                norm = mcolors.BoundaryNorm(boundaries, newcmp.N, clip=True)
+                print(cmap)
+                tmap = matplotlib.colors.LinearSegmentedColormap.from_list('map_white', cmap)
+                img_plot.axes.imshow(overlay, zorder=5, cmap=tmap, interpolation=None)
+                self.image_grid = np.full((self.rgb_img.shape[0], self.rgb_img.shape[1], 4), (0.0, 0.0, 0.0, 0.0))
             img_plot.draw()
     def img_display(self, slicescrollbar, img_plot, sv, mv):
 
         if self.metadata_file:
             data = pd.read_csv(self.metadata_file, sep="\t")
-
-            chan_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
+            import time
+            start=time.time()
+            ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
             #files = [x for x in os.listdir("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img") if
             #         Path("/data/home/kjok/phindr/Phindr3D/Phindr3D-Python/src/" + "test_img", x).is_file()]
-            slicescrollbar.setMinimum(0)
-            slicescrollbar.setMaximum((data.shape[0]-1)/(chan_len-1))
-            rgb_img=[]
+            slicescrollbar.setMaximum((data.shape[0]-1)/(ch_len-1))
+            rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
+            rgb_img = np.empty((rgb_img[0], rgb_img[1], 3, ch_len))
+            #rgb_img=np.empty((rgb_img[0], rgb_img[1], 3, chan_len))
+            #rgb_img=np.full((rgb_img[0],rgb_img[1], chan_len), (np.nan, np.nan, np.nan))
+            #rgb_img=np.zeros((rgb_img[0], rgb_img[1], chan_len), dtype='i,i,i')
+            #print(rgb_img.shape)
             keys, values = zip(*mcolors.CSS4_COLORS.items())
             #color=random.sample(range(0,len(keys)-1), 3)
-            color=[keys.index('red'), keys.index('green'), keys.index('blue')]
-            for ind, color in zip(range(int(slicescrollbar.value())*chan_len, int(slicescrollbar.value())*chan_len + chan_len), color):
-                ch_num=str(ind-int(slicescrollbar.value())*chan_len+1)
+            color=[mcolors.to_rgb(values[keys.index('cyan')]), mcolors.to_rgb(values[keys.index('orange')]), mcolors.to_rgb(values[keys.index('pink')])]
+
+            for ind, rgb_color in zip(range(slicescrollbar.value()*ch_len, slicescrollbar.value()*ch_len + ch_len), color):
+                start=time.time()
+                ch_num=str(ind-slicescrollbar.value()*ch_len+1)
                 data['Channel_'+ch_num]=data['Channel_'+ch_num].str.replace(r'\\', '/', regex=True)
                 cur_img = np.array(Image.open(
                    data['Channel_'+ch_num].iloc[ind]))
-
+                #index=np.where(cur_img > getImageThreshold(cur_img))
                 threshold=getImageThreshold(cur_img)
                 cur_img[cur_img<threshold]=0
-                cur_img=(cur_img-np.min(cur_img))/np.ptp(cur_img)
-                rgb_color=list(mcolors.to_rgb(values[color]))
-                print(rgb_color)
-                print(keys[color])
-                rgb_img.append([[(np.dot(rgb_color,i)) if i>0 else (0,0,0) for i in row] for row in cur_img])
-            print(np.shape(rgb_img))
-            rgb_img = np.array(rgb_img).transpose(1, 2, 3, 0).astype(float)
-            rgb_img[rgb_img == 0] = np.nan
-            rgb_img = np.nanmean(rgb_img, axis=-1)
-            rgb_img[np.isnan(rgb_img)]=0
-            max_rng=[np.max(rgb_img[:,:,i]) for i in range(chan_len)]
+                #cur_img=(cur_img-np.min(cur_img))/np.ptp(cur_img)
+                #rgb_color=(mcolors.to_rgb(values[color]))
+                #print(rgb_color)
+                #print(keys[color])
+                #cur_img[cur_img>getImageThreshold(cur_img)]=np.dot(cur_img[cur_img>getImageThreshold(cur_img)],rgb_color)
+               # print(np.shape(cur_img))
+                #cur_img[index[0], index[1]]*=rgb_color
+                #print(np.shape(cur_img))
+                #rgb_img[index[0],index[1],int(ch_num) - 1] = cur_img[index[0], index[1]]*rgb_color
+                #rgb_img[:, :, :, int(ch_num) - 1] = [[np.dot(rgb_color, i) for i in index[0]] for row
+                #                                     in index[1]]
+                #shape=np.dot(cur_img,rgb_color)
+                #print(np.array(rgb_color))
+                #print(cur_img*np.array(rgb_color).reshape(3, 1))
+                cur_img= np.dstack((cur_img, cur_img, cur_img))
+                rgb_img[:, :, :, int(ch_num) - 1] = cur_img*rgb_color
+                #rgb_img[:,:,:,int(ch_num)-1]=[[np.dot(rgb_color, i) if i > 0 else (0, 0, 0) for i in row] for row in cur_img]
+
+
+            #print(np.shape(rgb_img))
+            #rgb_img[rgb_img == 0] = np.nan
+            #rgb_img=np.sum(np.maximum(rgb_img, 0), axis=-1) / np.sum(rgb_img > 0, axis=-1)
+            '''
+            with warnings.catch_warnings():
+                warnings.filterwarnings(action='ignore', message='Mean of empty slice')
+                rgb_img = np.nanmean(rgb_img, axis=-1)
+                rgb_img[np.isnan(rgb_img)]=0
+            '''
+
+            cnt=np.sum(rgb_img!= 0, axis=-1)
+            tot = np.sum(rgb_img, axis=-1)
+            rgb_img=np.divide(tot, cnt, out=np.zeros_like(tot), where=cnt != 0)
+
+            max_rng=[np.max(rgb_img[:,:,i]) for i in range(ch_len)]
             self.rgb_img = (rgb_img) / (max_rng)
 
-            self.image_grid=np.zeros((self.rgb_img.shape[0], self.rgb_img.shape[1], 3))
             img_plot.axes.clear()
+            #img_plot.axes.set_aspect("auto")
             #for i in range(3):
             #    alpha=1.0
             #    if i>0:
             #        alpha=0.5
             #    img_plot.axes.imshow(self.rgb_img[:,:,:,i], alpha=alpha)
             img_plot.axes.imshow(self.rgb_img)
-            img_plot.axes.set_position([0, 0, 1, 1])
             img_plot.draw()
+            end=time.time()
+            print(end-start)
+            self.image_grid=np.full((self.rgb_img.shape[0], self.rgb_img.shape[1], 4), (0.0,0.0,0.0,0.0))
             sv.setChecked(False)
             mv.setChecked(False)
 
@@ -302,7 +343,7 @@ class MainGUI(QWidget):
         alert.exec()
 
     def file_window_show(self, sv, mv, adjustbar, slicescrollbar, img_plot):
-        self.metadata_file = str(QFileDialog.getOpenFileName(self, 'Select tractography file')[0])
+        self.metadata_file = str(QFileDialog.getOpenFileName(self, 'Select Metadata file')[0])
         if self.metadata_file and self.metadata_file.rsplit('.', 1)[-1]=="txt":
             print(self.metadata_file)
             adjustbar.setValue(0)

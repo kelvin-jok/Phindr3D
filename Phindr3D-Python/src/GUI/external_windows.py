@@ -24,6 +24,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 from matplotlib.figure import Figure
 from scipy.spatial import distance
 import numpy as np
+import decimal
 
 from PIL import Image
 import sys
@@ -38,6 +39,47 @@ class MplCanvas(FigureCanvasQTAgg):
         else:
             self.axes = self.fig.add_subplot(111, projection=None)
         super(MplCanvas, self).__init__(self.fig)
+
+class NavigationToolbar(NavigationToolbar):
+    # only display the buttons we need
+    NavigationToolbar.toolitems = (
+        #('Home', 'Reset original view', 'home', 'home'),
+        #('Back', 'Back to previous view', 'back', 'back'),
+        #('Forward', 'Forward to next view', 'forward', 'forward'),
+        (None, None, None, None),
+        (None, None, None, None),
+        (None, None, None, None),
+        (None, None, None, None),
+        (None, None, None, None),
+        ('Subplots', 'Configure subplots', 'subplots', 'configure_subplots'),
+        ('Customize', 'Edit axis, curve and image parameters', 'qt4_editor_options', 'edit_parameters'),
+        (None, None, None, None), ('Save', 'Save the figure', 'filesave', 'save_figure')
+    )
+class fixed_2d():
+    def __init__(self, main_plot, sc_plot, projection):
+        self.main_plot =main_plot
+        self.sc_plot =sc_plot
+        self.projection = projection
+    def __call__(self, event):
+
+        if event:
+            print(self.projection)
+            print(self.main_plot.axes.azim, self.main_plot.axes.elev)
+            print(self.main_plot.axes.azim+10)
+            if self.projection=="2d":
+                if event.button == 'up':
+                    print("2d")
+                    self.main_plot.axes.mouse_init()
+                    #self.main_plot.axes.view_init(azim=self.main_plot.axes.azim+10, elev=self.main_plot.axes.elev+10)
+                    self.main_plot.axes.xaxis.zoom(-1)
+                    self.main_plot.axes.yaxis.zoom(-1)
+                    self.main_plot.axes.zaxis.zoom(-1)
+                if event.button =='down':
+                    self.main_plot.axes.xaxis.zoom(1)
+                    self.main_plot.axes.yaxis.zoom(1)
+                    self.main_plot.axes.zaxis.zoom(-1)
+                self.main_plot.draw()
+                self.main_plot.axes.disable_mouse_rotation()
 
 class interactive_points(object):
     def __init__(self, xdata, ydata, zdata, sc, main_plot, projection):
@@ -135,7 +177,8 @@ class interactive_points(object):
                 # set current mousebutton to something unreasonable
                 self.scbounds.axes.button_pressed = -1
                 xyz_coord=self.scbounds.axes.format_coord(event.xdata, event.ydata)
-                xyz_coord = [float(x.split('=')[1].strip()) for x in xyz_coord.split(',')]
+                print(xyz_coord)
+                xyz_coord = [float(x.split('=')[1].strip().replace("−","-")) if x.find(".e") else float(x.split('=')[1].strip()) for x in xyz_coord.split(',')]
                 print(xyz_coord)
                 self.scbounds.axes.button_pressed=btn_press
                 #when clicked locate closest data point
@@ -155,7 +198,7 @@ class interactive_points(object):
             if self.projection=='2d':
                 self.main_plot.axes.scatter(xclose, yclose, s=12, facecolor="none", edgecolor='red', alpha=1)
             else:
-                self.main_plot.axes.scatter(xclose, yclose, zclose, s=12, facecolor="none", edgecolor='red', alpha=1, depthshade = False)
+                self.main_plot.axes.scatter(xclose, yclose, zclose, s=20, facecolor="none", edgecolor='red', alpha=1, depthshade = False)
             self.main_plot.draw()
             winc=self.winc
             winc.show()
@@ -231,8 +274,6 @@ class resultsWindow(QDialog):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
 
-
-
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -246,7 +287,9 @@ class resultsWindow(QDialog):
         export = clustering.addAction("Export Cluster Results")
         plotproperties = menubar.addMenu("Plot Properties")
         rotation = plotproperties.addAction("3D Rotation")
-        resetview = plotproperties.addAction("Reset Plot View")
+        reset_action = QAction("Reset Plot View", self)
+        reset_action.triggered.connect(lambda: self.reset_view())
+        resetview = plotproperties.addAction(reset_action)
 
         # menu features go here
 
@@ -279,41 +322,54 @@ class resultsWindow(QDialog):
         # test points. normally empty list x=[], y=[], z=[] #temp
         x = [1, 5]
         y = [7, 2]
-        z = [4, 9]
+        z=[0,0]
+        #z = [4, 9]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
-        self.main_plot=None
-        sc_plot=None
+        self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
+        sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
+        self.main_plot.axes.set_position([0, 0, 1, 1])
+        if not x and not y:
+            self.main_plot.axes.set_ylim(bottom=0)
+            self.main_plot.axes.set_xlim(left=0)
+        self.original_xlim=0
+        self.original_ylim=0
+        self.original_zlim=0
+
         projection = "2d"  # get from radiobutton
+        def axis_limit(sc_plot):
+            xlim = sc_plot.axes.get_xlim3d()
+            ylim = sc_plot.axes.get_ylim3d()
+            lower_lim=min(xlim[0], ylim[0])
+            upper_lim=max(xlim[1], ylim[1])
+            return(lower_lim, upper_lim)
         def check_projection(x, y, z, projection, sc_plot, twod):
             if twod.isChecked()==True:
-                if projection=="3d":
-                    self.main_plot.close()
-                projection = "2d"
-                self.main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=None)
-                sc_plot = self.main_plot.axes.scatter(x, y, s=10, alpha=1)
-                if not x and not y:
-                    self.main_plot.axes.set_ylim(bottom=0)
-                    self.main_plot.axes.set_xlim(left=0)
-                else:
-                    self.main_plot.axes.set_aspect('equal', adjustable='datalim')
-                self.main_plot.fig.canvas.draw()
-                layout.addWidget(self.main_plot, 1, 0, 1, 1)
+                projection="2d"
+                low, high= axis_limit(sc_plot)
+                print(low, high)
+                self.main_plot.axes.mouse_init()
+                self.main_plot.axes.view_init(azim=-95, elev=90)
+                if self.original_xlim==0 and self.original_ylim==0 and self.original_zlim==0:
+                    self.original_xlim=[low-1, high+1]
+                    self.original_ylim=[low - 1, high + 1]
+                    self.original_zlim=[0, 0.1]
+                self.main_plot.axes.set_xlim(low-1, high+1)
+                self.main_plot.axes.set_ylim(low-1, high+1)
+                self.main_plot.axes.get_zaxis().line.set_linewidth(0)
+                #self.main_plot.axes.set_zticklabels(fontsize=0)
+                self.main_plot.axes.tick_params(axis='z', labelsize=0)
+                #self.main_plot.axes.get_zaxis().set_ticks(fontsize=0)
+                self.main_plot.axes.set_zlim3d(0,0.1)
+                self.main_plot.draw()
+                self.main_plot.axes.disable_mouse_rotation()
             else:
                 projection="3d"
-                #self.main_plot.axes.clear()
-                #self.main_plot.fig.clf()
-                #self.main_plot.axes.cla()
-                self.main_plot.close()
-                # self.main_plot.axes.cla()
-                #self.main_plot.fig.delaxes(self.main_plot.axes)
-                #del self.main_plot
-                #self.main_plot.fig.clf()
-                self.main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
-                sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
+                self.main_plot.axes.get_zaxis().line.set_linewidth(1)
+                self.main_plot.axes.tick_params(axis='z', labelsize=10)
                 self.main_plot.fig.canvas.draw()
-                layout.addWidget(self.main_plot, 1, 0, 1, 1)
+                self.main_plot.axes.mouse_init()
 
         # building layout
         layout = QGridLayout()
@@ -324,9 +380,12 @@ class resultsWindow(QDialog):
         # button features go here
         twod.toggled.connect(lambda: check_projection(x, y, z, projection, sc_plot, twod))
         twod.setChecked(True)
-        img_click = interactive_points(x, y, z, sc_plot, self.main_plot, projection)
+        img_click = interactive_points(x, y, z, sc_plot, self.main_plot, "3d")
+        fixed_camera = fixed_2d(self.main_plot, sc_plot, projection)
         # connect mouse-click to figure
+        rot =self.main_plot.fig.canvas.mpl_connect('scroll_event', fixed_camera)
         cid = self.main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+
         '''
         if projection == '2d':
             sc_plot = main_plot.axes.scatter(x, y, s=10, alpha=1)
@@ -342,6 +401,13 @@ class resultsWindow(QDialog):
         cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
         '''
         toolbar = NavigationToolbar(self.main_plot, self)
+
+        #print(dir(toolbar))
+        #self.main_plot.fig.canvas.manager.toolmanager.remove_tool("Pan")
+        #self.main_plot.fig.canvas.manager.toolmanager.remove_tool("Zoom")
+        #print(toolbar.actions)
+        #toolbar.removeAction('Pan')
+        #toolbar.removeAction('Zoom')
         layout.addWidget(toolbar, 0, 0, 1, 1)
         layout.addWidget(self.main_plot, 1, 0, 1, 1)
         layout.addWidget(box, 2, 0, 1, 1)
@@ -351,10 +417,15 @@ class resultsWindow(QDialog):
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
-        minsize.setHeight(self.minimumSizeHint().height() + 200)
-        minsize.setWidth(self.minimumSizeHint().width() + 100)
+        minsize.setHeight(self.minimumSizeHint().height() + 400)
+        minsize.setWidth(self.minimumSizeHint().width() + 400)
         self.setFixedSize(minsize)
-
+    def reset_view(self):
+        print(self.original_xlim, self.original_ylim, self.original_zlim)
+        self.main_plot.axes.set_xlim(self.original_xlim)
+        self.main_plot.axes.set_ylim(self.original_ylim)
+        self.main_plot.axes.set_zlim3d(self.original_zlim)
+        self.main_plot.draw()
 class paramWindow(QDialog):
     def __init__(self):
         super(paramWindow, self).__init__()
