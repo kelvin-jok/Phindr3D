@@ -26,22 +26,6 @@ import numpy as np
 from PIL import Image
 import sys
 
-class load_file(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("load file")
-        self.resize(500, 200)
-
-        test_label = QLabel("Filler.......")
-        layout = QFormLayout()
-        layout.addRow(test_label)
-        self.setLayout(layout)
-
-        #open window on center of screen
-        frame = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
-        frame.moveCenter(cp)
-        self.move(frame.topLeft())
 
 class MainGUI(QWidget, external_windows):
     """Defines the main GUI window of Phindr3D"""
@@ -81,23 +65,30 @@ class MainGUI(QWidget, external_windows):
                 winp = self.buildParamWindow()
                 winp.show()
                 winp.exec()
+            '''    
             elif buttonPressed == "Set Channel Colors":
-                color = QColorDialog.getColor()
-                return color
+                win_color = self.buildColorChannelWindow()
+                win_color.show()
+                win_color.exec()
+                #color = QColorDialog.getColor()
+                #color=color.getRgb()[:-1]
+                #print(color)
+                #return color
+            '''
 
         def exportError():
             if not self.metadata_file:
                 alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
                 alert.exec()
 
-        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot):
+        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot, color):
             filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
             if filename != '':
                 self.metadata_file=filename
                 print(self.metadata_file)
                 adjustbar.setValue(0)
                 slicescrollbar.setValue(0)
-                self.img_display(slicescrollbar, img_plot, sv, mv)
+                self.img_display(slicescrollbar, img_plot, sv, mv, color)
             else:
                 load_metadata_win = self.buildErrorWindow("Select Valid Metadatafile (.txt)", QMessageBox.Critical)
                 load_metadata_win.exec()
@@ -181,6 +172,12 @@ class MainGUI(QWidget, external_windows):
         # Creating and formatting menubar
         layout.setMenuBar(menubar)
 
+        def colorpicker():
+            prev_color=self.color[:]
+            colorchannelWindow(self.ch_len, self.color)
+            if np.array_equal(prev_color, self.color)==False:
+                self.img_display(slicescrollbar, img_plot, sv, mv, self.color)
+
         # create analysis parameters box (top left box)
         analysisparam = QGroupBox("Analysis Parameters")
         grid = QGridLayout()
@@ -232,12 +229,20 @@ class MainGUI(QWidget, external_windows):
         img_plot.axes.set_aspect("auto")
         img_plot.axes.set_position([0, 0, 1, 1])
         self.setLayout(layout)
+        #Default color Values for image plot
+        # temporarily default red, green, blue ... (to do add colourpicker...)
+        keys, values = zip(*mcolors.CSS4_COLORS.items())
+        self.color = [mcolors.to_rgb(values[keys.index('red')]), mcolors.to_rgb(values[keys.index('green')]),
+                 mcolors.to_rgb(values[keys.index('blue')])]
+        #self.color=colorchannel().colors
 
+        self.ch_len=1
         #mainGUI buttons clicked
-        loadmeta.clicked.connect(lambda: loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot))
+        loadmeta.clicked.connect(lambda: loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot, self.color))
         nextimage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())+1))
         previmage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())-1) if int(slicescrollbar.value())>0 else None)
-        slicescrollbar.valueChanged.connect(lambda: self.img_display(slicescrollbar, img_plot, sv, mv))
+        setcolors.clicked.connect(lambda: colorpicker())
+        slicescrollbar.valueChanged.connect(lambda: self.img_display(slicescrollbar, img_plot, sv, mv, self.color))
         #TEMPORARY PARAMS! until set voxel parameters is finished...
         class params(object):
                 tileX = 10
@@ -265,22 +270,20 @@ class MainGUI(QWidget, external_windows):
                 self.image_grid = np.full((self.rgb_img.shape[0], self.rgb_img.shape[1], 4), (0.0, 0.0, 0.0, 0.0))
             img_plot.draw()
     #draw superimposed image channels
-    def img_display(self, slicescrollbar, img_plot, sv, mv):
+    def img_display(self, slicescrollbar, img_plot, sv, mv, color):
 
         if self.metadata_file:
             #extract image details from metadata
             data = pd.read_csv(self.metadata_file, sep="\t")
-            ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
-            slicescrollbar.setMaximum((data.shape[0]-1)/(ch_len-1))
+            self.ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
+            slicescrollbar.setMaximum((data.shape[0]-1)/(self.ch_len-1))
             print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
-            rgb_img = np.empty((rgb_img[0], rgb_img[1], 3, ch_len))
-            #temporarily default red, green, blue ... (to do add colourpicker...)
-            keys, values = zip(*mcolors.CSS4_COLORS.items())
-            color=[mcolors.to_rgb(values[keys.index('red')]), mcolors.to_rgb(values[keys.index('green')]), mcolors.to_rgb(values[keys.index('blue')])]
+            rgb_img = np.empty((rgb_img[0], rgb_img[1], 3, self.ch_len))
+
             #threshold/colour each image channel
-            for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value()+ ch_len), color):
+            for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value()+ self.ch_len), color):
                 ch_num=str(ind-slicescrollbar.value()+1)
                 data['Channel_'+ch_num]=data['Channel_'+ch_num].str.replace(r'\\', '/', regex=True)
                 cur_img = np.array(Image.open(data['Channel_'+ch_num].iloc[ind]))
@@ -293,8 +296,8 @@ class MainGUI(QWidget, external_windows):
             divisor=np.sum(rgb_img!= 0, axis=-1)
             tot = np.sum(rgb_img, axis=-1)
             rgb_img=np.divide(tot, divisor, out=np.zeros_like(tot), where=divisor != 0)
-            max_rng=[np.max(rgb_img[:,:,i]) for i in range(ch_len)]
-            self.rgb_img = (rgb_img) / (max_rng)
+            max_rng=[np.max(rgb_img[:,:,i]) if np.max(rgb_img[:,:,i])>0 else 1 for i in range(self.ch_len)]
+            self.rgb_img = np.divide(rgb_img,max_rng)
 
             #plot combined channels
             img_plot.axes.clear()
@@ -317,10 +320,6 @@ class MainGUI(QWidget, external_windows):
         alert.setText("talk about the program")
         alert.setWindowTitle("About")
         alert.exec()
-
-    def file_window_show(self, sv, mv, adjustbar, slicescrollbar, img_plot):
-        self.metadata_file = str(QFileDialog.getOpenFileName(self, 'Select Metadata file')[0])
-
 
     def closeEvent(self, event):
         print("closed all windows")

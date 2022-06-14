@@ -7,7 +7,7 @@ from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-
+import matplotlib.colors as mcolors
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -570,6 +570,35 @@ class segmentationWindow(QDialog):
         choosemdata.clicked.connect(segment)
         self.layout().addWidget(choosemdata)
 
+class colorchannelWindow(object):
+    def __init__(self, ch, color):
+        win = QDialog()
+        win.setWindowTitle("Color Channel Picker")
+        title = QLabel("Channels")
+        title.setFont(QFont('Arial', 25))
+        win.setLayout(QFormLayout())
+        win.layout().addWidget(title)
+        self.btn=[]
+        self.btn_grp = QButtonGroup()
+        self.btn_grp.setExclusive(True)
+        self.color=color
+
+        for i in range(ch):
+            self.btn.append(QPushButton('Channel_' + str(i+1)))
+            self.btn[i].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[i])*255).astype(int))) +';')
+            win.layout().addRow(self.btn[i])
+            self.btn_grp.addButton(self.btn[i], i+1)
+        print(self.btn_grp.buttons())
+
+        self.btn_grp.buttonPressed.connect(self.colorpicker_window)
+        win.show()
+        win.exec()
+    def colorpicker_window(self, button):
+            #print(button.text())
+            rgb_color = QColorDialog.getColor()
+            self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
+            self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[int(button.text()[-1])-1])*255).astype(int))) +';')
+
 class external_windows():
     def buildExtractWindow(self):
         return extractWindow()
@@ -582,3 +611,5 @@ class external_windows():
 
     def buildSegmentationWindow(self):
         return segmentationWindow()
+    def buildColorchannelWindow(self):
+        return colorchannelWindow()
