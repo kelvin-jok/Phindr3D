@@ -26,7 +26,7 @@ import numpy as np
 from PIL import Image
 import sys
 
-class MainGUI(QWidget):
+class MainGUI(QWidget, external_windows):
     """Defines the main GUI window of Phindr3D"""
 
     def __init__(self):
@@ -62,7 +62,7 @@ class MainGUI(QWidget):
                 alert = self.buildErrorWindow("Metadata not found!!", QMessageBox.Critical)
                 alert.exec()
             elif buttonPressed == "Set Voxel Parameters":
-                winp = paramWindow()
+                winp = self.buildParamWindow()
                 winp.show()
                 winp.exec()
 
@@ -116,12 +116,12 @@ class MainGUI(QWidget):
 
         # Menu actions defined here
         def extractMetadata():
-            winz = extractWindow()
+            winz = self.buildExtractWindow()
             winz.show()
             winz.exec()
 
         def viewResults():
-            winc = resultsWindow()
+            winc = self.buildResultsWindow()
             winc.show()
             winc.exec()
 
@@ -177,7 +177,7 @@ class MainGUI(QWidget):
         # Phind button
         layout.addWidget(phind, 3, 0, Qt.AlignCenter)
 
-        # initialize image plot
+        # initialize image plot and layout
         imgwindow = QGroupBox()
         imgwindow.setFlat(True)
 
@@ -209,7 +209,7 @@ class MainGUI(QWidget):
         param=params()
         sv.stateChanged.connect(lambda : self.overlay_display(img_plot, self.image_grid, param, sv, mv, 'SV'))
         mv.stateChanged.connect(lambda : self.overlay_display(img_plot, self.image_grid, param, mv, sv, 'MV'))
-
+    #draws image layers
     def overlay_display(self, img_plot, img_grid, params, checkbox_cur, checkbox_prev, type):
 
         if self.metadata_file:
@@ -226,6 +226,7 @@ class MainGUI(QWidget):
                 img_plot.axes.imshow(overlay, zorder=5, cmap=cmap, interpolation=None)
                 self.image_grid = np.full((self.rgb_img.shape[0], self.rgb_img.shape[1], 4), (0.0, 0.0, 0.0, 0.0))
             img_plot.draw()
+    #draw superimposed image channels
     def img_display(self, slicescrollbar, img_plot, sv, mv):
 
         if self.metadata_file:
