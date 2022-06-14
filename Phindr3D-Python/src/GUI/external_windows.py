@@ -55,11 +55,113 @@ class NavigationToolbar(NavigationToolbar):
         ('Customize', 'Edit axis, curve and image parameters', 'qt4_editor_options', 'edit_parameters'),
         (None, None, None, None), ('Save', 'Save the figure', 'filesave', 'save_figure')
     )
+
+
+class pick_onclick():
+    def __init__(self, main_plot, projection, x, y, z):
+        self.main_plot=main_plot
+        self.projection=projection
+        self.x=x
+        self.y=y
+        self.z=z
+        class buildImageViewer(QWidget):
+            def __init__(self):
+                super().__init__()
+                self.resize(1000, 1000)
+                self.setWindowTitle("ImageViewer")
+                grid = QGridLayout()
+
+                #info layout
+                info_box = QVBoxLayout()
+                file_info=QLineEdit("FileName:\n")
+                file_info.setAlignment(Qt.AlignTop)
+                file_info.setReadOnly(True)
+                ch_info=QLineEdit("Channels\n")
+                ch_info.setAlignment(Qt.AlignTop)
+                ch_info.setReadOnly(True)
+                file_info.setFixedWidth(200)
+                file_info.setMinimumHeight(350)
+                ch_info.setFixedWidth(200)
+                ch_info.setMinimumHeight(350)
+                info_box.addStretch()
+                info_box.addWidget(file_info)
+                info_box.addWidget(ch_info)
+                info_box.addStretch()
+
+                #projection layout
+                pjt_box = QGroupBox("Projection Type")
+                pjt_type= QHBoxLayout()
+                slice_btn = QRadioButton("Slice")
+                mit_btn = QRadioButton("MIT")
+                montage_btn = QRadioButton("Montage")
+                pjt_type.addStretch()
+                pjt_type.addWidget(slice_btn)
+                pjt_type.addWidget(mit_btn)
+                pjt_type.addWidget(montage_btn)
+                pjt_type.addStretch()
+                pjt_type.setSpacing(100)
+                pjt_box.setLayout(pjt_type)
+
+                #image plot layout
+                matplotlib.use('Qt5Agg')
+
+                x = []
+                y = []
+                # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
+                # x=
+                # y=
+                main_plot = MplCanvas(self, width=12, height=12, dpi=100, projection='2d')
+                main_plot.fig.set_facecolor('#f0f0f0')
+                main_plot.axes.scatter(x, y)
+                main_plot.axes.get_xaxis().set_visible(False)
+                main_plot.axes.get_yaxis().set_visible(False)
+
+                # adjustbar layout
+                adjustbar = QSlider(Qt.Vertical)
+                adjustbar.setFixedWidth(50)
+                adjustbar.setStyleSheet(
+                    "QSlider::groove:vertical {background-color: #8DE8F6; border: 1px solid;height: 700px;margin: 0px;}"
+                    "QSlider::handle:vertical {background-color: #8C8C8C; border: 1px silver; height: 30px; width: 10px; margin: -5px 0px;}")
+
+                #parent layout
+                grid.addLayout(info_box, 0, 0)
+                grid.addWidget(main_plot, 0, 1)
+                grid.addWidget(pjt_box, 1, 1, Qt.AlignCenter)
+                grid.addWidget(adjustbar, 0, 2)
+
+                self.setLayout(grid)
+
+        self.winc = buildImageViewer()
+    def __call__(self, event):
+        if event:
+            point_index = int(event.ind)
+            print(point_index)
+
+        # proj = ax.get_proj()
+        # x_p, y_p, _ = proj3d.proj_transform(x[point_index], y[point_index], z[point_index], proj)
+        # plt.annotate(str(point_index), xy=(x_p, y_p))
+
+            print("X=",self.x[point_index], " Y=", self.y[point_index], " Z=", self.z[point_index], " PointIdx=", point_index)
+            plt.figure(1)
+
+            if self.projection=='2d':
+                self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], s=12, facecolor="none", edgecolor='red', alpha=1)
+            else:
+                self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1, depthshade = False)
+            self.main_plot.draw()
+            winc=self.winc
+            winc.show()
+
+
 class fixed_2d():
     def __init__(self, main_plot, sc_plot, projection):
         self.main_plot =main_plot
         self.sc_plot =sc_plot
         self.projection = projection
+
+
+
+
     def __call__(self, event):
 
         if event:
@@ -317,18 +419,18 @@ class resultsWindow(QDialog):
         boxlayout.addWidget(QLabel("Color By"), 0, 2, 1, 1)
         boxlayout.addWidget(colordropdown, 1, 2, 1, 1)
         box.setLayout(boxlayout)
-
+        #setup Matplotlib
         matplotlib.use('Qt5Agg')
-        # test points. normally empty list x=[], y=[], z=[] #temp
+        # test points. normally empty list x=[], y=[], z=[] #temporary until read in formated super/megavoxel data
         x = [1, 5]
         y = [7, 2]
-        z=[0,0]
+        z = [0,0]
         #z = [4, 9]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
         # x=
         # y=
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
-        sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
+        sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False, picker=True)
         self.main_plot.axes.set_position([0, 0, 1, 1])
         if not x and not y:
             self.main_plot.axes.set_ylim(bottom=0)
@@ -350,7 +452,7 @@ class resultsWindow(QDialog):
                 low, high= axis_limit(sc_plot)
                 print(low, high)
                 self.main_plot.axes.mouse_init()
-                self.main_plot.axes.view_init(azim=-95, elev=90)
+                self.main_plot.axes.view_init(azim=-90, elev=89)
                 if self.original_xlim==0 and self.original_ylim==0 and self.original_zlim==0:
                     self.original_xlim=[low-1, high+1]
                     self.original_ylim=[low - 1, high + 1]
@@ -358,9 +460,7 @@ class resultsWindow(QDialog):
                 self.main_plot.axes.set_xlim(low-1, high+1)
                 self.main_plot.axes.set_ylim(low-1, high+1)
                 self.main_plot.axes.get_zaxis().line.set_linewidth(0)
-                #self.main_plot.axes.set_zticklabels(fontsize=0)
                 self.main_plot.axes.tick_params(axis='z', labelsize=0)
-                #self.main_plot.axes.get_zaxis().set_ticks(fontsize=0)
                 self.main_plot.axes.set_zlim3d(0,0.1)
                 self.main_plot.draw()
                 self.main_plot.axes.disable_mouse_rotation()
@@ -371,49 +471,26 @@ class resultsWindow(QDialog):
                 self.main_plot.fig.canvas.draw()
                 self.main_plot.axes.mouse_init()
 
-        # building layout
-        layout = QGridLayout()
-        # setup matplotlib figure
 
-        #main_plot = MplCanvas(self, width=5, height=5, dpi=100, projection=projection)
 
         # button features go here
         twod.toggled.connect(lambda: check_projection(x, y, z, projection, sc_plot, twod))
         twod.setChecked(True)
         img_click = interactive_points(x, y, z, sc_plot, self.main_plot, "3d")
         fixed_camera = fixed_2d(self.main_plot, sc_plot, projection)
-        # connect mouse-click to figure
+        picked=pick_onclick(self.main_plot, projection, x, y, z)
+        # matplotlib callback mouse/scroller actions
         rot =self.main_plot.fig.canvas.mpl_connect('scroll_event', fixed_camera)
-        cid = self.main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+        #cid = self.main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
+        self.main_plot.fig.canvas.mpl_connect('pick_event', picked)
 
-        '''
-        if projection == '2d':
-            sc_plot = main_plot.axes.scatter(x, y, s=10, alpha=1)
-            if not x and not y:
-                main_plot.axes.set_ylim(bottom=0)
-                main_plot.axes.set_xlim(left=0)
-            else:
-                main_plot.axes.set_aspect('equal', adjustable='datalim')
-        else:
-            sc_plot = main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False)
-        img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
-        # connect mouse-click to figure
-        cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
-        '''
+        # building layout
+        layout = QGridLayout()
         toolbar = NavigationToolbar(self.main_plot, self)
 
-        #print(dir(toolbar))
-        #self.main_plot.fig.canvas.manager.toolmanager.remove_tool("Pan")
-        #self.main_plot.fig.canvas.manager.toolmanager.remove_tool("Zoom")
-        #print(toolbar.actions)
-        #toolbar.removeAction('Pan')
-        #toolbar.removeAction('Zoom')
         layout.addWidget(toolbar, 0, 0, 1, 1)
         layout.addWidget(self.main_plot, 1, 0, 1, 1)
         layout.addWidget(box, 2, 0, 1, 1)
-        #img_click = interactive_points(x, y, z, sc_plot, main_plot, projection)
-        # connect mouse-click to figure
-        #cid = main_plot.fig.canvas.mpl_connect('button_press_event', img_click)
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
@@ -425,7 +502,9 @@ class resultsWindow(QDialog):
         self.main_plot.axes.set_xlim(self.original_xlim)
         self.main_plot.axes.set_ylim(self.original_ylim)
         self.main_plot.axes.set_zlim3d(self.original_zlim)
+        self.main_plot.axes.view_init(azim=-90, elev=89)
         self.main_plot.draw()
+
 class paramWindow(QDialog):
     def __init__(self):
         super(paramWindow, self).__init__()

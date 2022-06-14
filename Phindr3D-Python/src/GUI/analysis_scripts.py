@@ -1,5 +1,22 @@
+# Copyright (C) 2022 Sunnybrook Research Institute
+# This file is part of src <https://github.com/DWALab/Phindr3D>.
+#
+# src is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# src is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with src.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
+#script modified/taken from previous PHINDR functions...
 
+#NOTE: param.intensityNormPerTreatment if True max-min normalization based on treatment max, min
 def getImageThreshold(IM):
     """called in getIndividualChannelThreshold"""
     maxBins = 256
@@ -34,34 +51,25 @@ def getImageWithSVMVOverlay(IM, param, type):
     """
     xOffset = np.mod(IM.shape[0], param.tileX);
     yOffset = np.mod(IM.shape[1], param.tileY);
-    #zOffset = mod(dimSize(3), param.tileZ);
-
     param.croppedX = IM.shape[0] - xOffset;
     param.croppedY = IM.shape[1] - yOffset;
-    #param.croppedZ = dimSize(3) - zOffset;
-
     superVoxelXOffset = np.mod(param.croppedX/ param.tileX, param.megaVoxelTileX);
     superVoxelYOffset = np.mod(param.croppedY/ param.tileY, param.megaVoxelTileY);
     spX = int((param.croppedX/ param.tileX));
     spY = int((param.croppedY/ param.tileY));
     tmpX = int((param.croppedX/ param.tileX) + superVoxelXOffset);
     tmpY = int((param.croppedY/ param.tileY) + superVoxelYOffset);
-    print(tmpX)
-    print(tmpY)
+
     if type == 'SV':
-        #IM[range(0,IM.shape[0],spX), :,:] = (0.7, 0.7, 0.7, 1.0)
-        #IM[:, range(0,IM.shape[1],spY),:] = (0.7, 0.7, 0.7, 1.0)
-        #IM[range(1, IM.shape[0], spX), :, :] = (0.7, 0.7, 0.7, 1.0)
-        #IM[:, range(1, IM.shape[1], spY), :] = (0.7, 0.7, 0.7, 1.0)
-        IM[range(0,IM.shape[0],param.tileX), :,:] = (0.7, 0.7, 0.7, 1.0)
-        IM[:, range(0,IM.shape[1],param.tileY),:] = (0.7, 0.7, 0.7, 1.0)
-        IM[range(0,IM.shape[0],param.tileX), :,:] = (0.7, 0.7, 0.7, 1.0)
-        IM[:, range(0,IM.shape[1],param.tileY),:] = (0.7, 0.7, 0.7, 1.0)
+        IM[range(0,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
+        IM[:, range(0,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
+        IM[range(1,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
+        IM[:, range(1,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
+
     else:
         IM[range(0,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
         IM[:, range(0,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
         IM[range(1,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
         IM[:, range(1,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
-        #IM[range(0,IM.shape[0],param.tileX*param.megaVoxelTileX), :,:] = (1.0, 1.0, 1.0, 1.0)
-        #IM[:, range(0,IM.shape[1], param.tileY*param.megaVoxelTileY),:] = (1.0, 1.0, 1.0, 1.0)
+
     return IM
