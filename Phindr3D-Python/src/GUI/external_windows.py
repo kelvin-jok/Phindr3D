@@ -295,7 +295,7 @@ class resultsWindow(QDialog):
                 checkbox_prev.setChecked(False)
             check_projection(x, y, z, projection, sc_plot, dim)
         def check_projection(x, y, z, projection, sc_plot, dim):
-            if dim== "2d":
+            if dim == "2d":
                 projection=dim
                 low, high= axis_limit(sc_plot)
                 #for debugging
@@ -312,7 +312,7 @@ class resultsWindow(QDialog):
                 self.main_plot.axes.set_zlim3d(0,0.1)
                 self.main_plot.draw()
                 self.main_plot.axes.disable_mouse_rotation()
-            elif dim== "3d":
+            elif dim == "3d":
                 projection = dim
                 self.main_plot.axes.get_zaxis().line.set_linewidth(1)
                 self.main_plot.axes.tick_params(axis='z', labelsize=10)
