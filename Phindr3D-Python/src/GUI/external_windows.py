@@ -1,5 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+import numpy as np
 import matplotlib
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
@@ -278,7 +280,8 @@ class resultsWindow(QDialog):
             self.main_plot.axes.set_xlim(left=0)
         self.original_xlim=0
         self.original_ylim=0
-        self.original_zlim=0
+        if all(np.array(z)==0):
+            self.original_zlim=[0, 0.1]
 
         projection = "2d"  # update from radiobutton
         def axis_limit(sc_plot):
@@ -287,9 +290,13 @@ class resultsWindow(QDialog):
             lower_lim=min(xlim[0], ylim[0])
             upper_lim=max(xlim[1], ylim[1])
             return(lower_lim, upper_lim)
-        def check_projection(x, y, z, projection, sc_plot, twod):
-            if twod.isChecked()==True:
-                projection="2d"
+        def toggle_2d_3d(x, y, z, projection, sc_plot, checkbox_cur, checkbox_prev, dim):
+            if checkbox_cur.isChecked() and checkbox_prev.isChecked():
+                checkbox_prev.setChecked(False)
+            check_projection(x, y, z, projection, sc_plot, dim)
+        def check_projection(x, y, z, projection, sc_plot, dim):
+            if dim== "2d":
+                projection=dim
                 low, high= axis_limit(sc_plot)
                 #for debugging
                 #print(low, high)
@@ -298,7 +305,6 @@ class resultsWindow(QDialog):
                 if self.original_xlim==0 and self.original_ylim==0 and self.original_zlim==0:
                     self.original_xlim=[low-1, high+1]
                     self.original_ylim=[low - 1, high + 1]
-                    self.original_zlim=[0, 0.1]
                 self.main_plot.axes.set_xlim(low-1, high+1)
                 self.main_plot.axes.set_ylim(low-1, high+1)
                 self.main_plot.axes.get_zaxis().line.set_linewidth(0)
@@ -306,17 +312,16 @@ class resultsWindow(QDialog):
                 self.main_plot.axes.set_zlim3d(0,0.1)
                 self.main_plot.draw()
                 self.main_plot.axes.disable_mouse_rotation()
-            else:
-                projection="3d"
+            elif dim== "3d":
+                projection = dim
                 self.main_plot.axes.get_zaxis().line.set_linewidth(1)
                 self.main_plot.axes.tick_params(axis='z', labelsize=10)
                 self.main_plot.fig.canvas.draw()
                 self.main_plot.axes.mouse_init()
 
-
-
         # button features go here
-        twod.toggled.connect(lambda: check_projection(x, y, z, projection, sc_plot, twod))
+        twod.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, twod, threed, "2d"))
+        threed.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, threed, twod, "3d"))
         twod.setChecked(True)
         fixed_camera = fixed_2d(self.main_plot, sc_plot, projection)
         picked=pick_onclick(self.main_plot, projection, x, y, z)
@@ -334,8 +339,8 @@ class resultsWindow(QDialog):
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
-        minsize.setHeight(self.minimumSizeHint().height() + 200)
-        minsize.setWidth(self.minimumSizeHint().width() + 100)
+        minsize.setHeight(self.minimumSizeHint().height() + 400)
+        minsize.setWidth(self.minimumSizeHint().width() + 300)
         self.setFixedSize(minsize)
     def reset_view(self):
         print(self.original_xlim, self.original_ylim, self.original_zlim)

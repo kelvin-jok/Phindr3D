@@ -92,7 +92,8 @@ class MainGUI(QWidget, external_windows):
 
         def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot):
             filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
-            if self.metadata_file and self.metadata_file.rsplit('.', 1)[-1] == "txt":
+            if filename != '':
+                self.metadata_file=filename
                 print(self.metadata_file)
                 adjustbar.setValue(0)
                 slicescrollbar.setValue(0)
@@ -107,7 +108,6 @@ class MainGUI(QWidget, external_windows):
         # Otherwise, execute button behaviour, depending on button (pass extra parameter to
         # distinguish which button was pressed into metadataError()?)
         setvoxel.clicked.connect(lambda: metadataError("Set Voxel Parameters"))
-        loadmeta.clicked.connect(lambda: loadMetadata())
         sv.clicked.connect(lambda: metadataError("SV"))
         mv.clicked.connect(lambda: metadataError("MV"))
         adjustbar.valueChanged.connect(lambda: metadataError("Adjust Image Threshold"))
@@ -169,7 +169,6 @@ class MainGUI(QWidget, external_windows):
             self.metadata_file= not self.metadata_file
 
         createmetadata.triggered.connect(extractMetadata)
-        loadmetadata.triggered.connect(loadMetadata)
         viewresults.triggered.connect(viewResults)
         imagetabnext.triggered.connect(metadataError)
         imagetabcolors.triggered.connect(metadataError)
@@ -235,7 +234,7 @@ class MainGUI(QWidget, external_windows):
         self.setLayout(layout)
 
         #mainGUI buttons clicked
-        loadmeta.clicked.connect(lambda: self.loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot))
+        loadmeta.clicked.connect(lambda: loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot))
         nextimage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())+1))
         previmage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())-1) if int(slicescrollbar.value())>0 else None)
         slicescrollbar.valueChanged.connect(lambda: self.img_display(slicescrollbar, img_plot, sv, mv))
