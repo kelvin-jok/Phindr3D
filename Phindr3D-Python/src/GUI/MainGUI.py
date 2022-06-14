@@ -26,6 +26,23 @@ import numpy as np
 from PIL import Image
 import sys
 
+class load_file(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("load file")
+        self.resize(500, 200)
+
+        test_label = QLabel("Filler.......")
+        layout = QFormLayout()
+        layout.addRow(test_label)
+        self.setLayout(layout)
+
+        #open window on center of screen
+        frame = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        frame.moveCenter(cp)
+        self.move(frame.topLeft())
+
 class MainGUI(QWidget, external_windows):
     """Defines the main GUI window of Phindr3D"""
 
@@ -46,7 +63,6 @@ class MainGUI(QWidget, external_windows):
         setvoxel = QPushButton("Set Voxel Parameters")
         sv = QCheckBox("SV")
         mv = QCheckBox("MV")
-
         adjust = QLabel("Adjust Image Threshold")
         adjustbar = QSlider(Qt.Horizontal)
         setcolors = QPushButton("Set Channel Colors")
@@ -65,22 +81,38 @@ class MainGUI(QWidget, external_windows):
                 winp = self.buildParamWindow()
                 winp.show()
                 winp.exec()
+            elif buttonPressed == "Set Channel Colors":
+                color = QColorDialog.getColor()
+                return color
 
         def exportError():
             if not self.metadata_file:
                 alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
                 alert.exec()
 
+        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot):
+            filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
+            if self.metadata_file and self.metadata_file.rsplit('.', 1)[-1] == "txt":
+                print(self.metadata_file)
+                adjustbar.setValue(0)
+                slicescrollbar.setValue(0)
+                self.img_display(slicescrollbar, img_plot, sv, mv)
+            else:
+                load_metadata_win = self.buildErrorWindow("Select Valid Metadatafile (.txt)", QMessageBox.Critical)
+                load_metadata_win.exec()
+                # When meta data is loaded, using the loaded data, change the data for image viewing
+                # Consider adding another class to store all of the data (GUIDATA in MATLab?)
+
         # metadataError will check if there is metadata. If there is not, create error message.
         # Otherwise, execute button behaviour, depending on button (pass extra parameter to
         # distinguish which button was pressed into metadataError()?)
         setvoxel.clicked.connect(lambda: metadataError("Set Voxel Parameters"))
+        loadmeta.clicked.connect(lambda: loadMetadata())
         sv.clicked.connect(lambda: metadataError("SV"))
         mv.clicked.connect(lambda: metadataError("MV"))
         adjustbar.valueChanged.connect(lambda: metadataError("Adjust Image Threshold"))
         setcolors.clicked.connect(lambda: metadataError("Set Channel Colors"))
         slicescrollbar.valueChanged.connect(lambda: metadataError("Slice Scroll"))
-        #slicescrollbar.valueChanged.connect(lambda: metadataError("Slice Scroll"))
         nextimage.clicked.connect(lambda: metadataError("Next Image"))
         phind.clicked.connect(lambda: metadataError("Phind"))
         # QScrollBar.valueChanged signal weird, one tap would cause the signal to repeat itself
@@ -109,6 +141,8 @@ class MainGUI(QWidget, external_windows):
 
         about = menubar.addAction("About")
 
+        segmentation = menubar.addAction("Organoid Segmentation App")
+
         # Testing purposes
         test = menubar.addMenu("Test")
         switchmeta = test.addAction("Switch Metadata")
@@ -125,21 +159,28 @@ class MainGUI(QWidget, external_windows):
             winc.show()
             winc.exec()
 
+        def organoidSegmentation():
+            wino = self.buildSegmentationWindow()
+            wino.show()
+            wino.exec()
+
         # Function purely for testing purposes, this function will switch 'foundMetadata' to true or false
         def testMetadata():
             self.metadata_file= not self.metadata_file
 
         createmetadata.triggered.connect(extractMetadata)
+        loadmetadata.triggered.connect(loadMetadata)
         viewresults.triggered.connect(viewResults)
         imagetabnext.triggered.connect(metadataError)
         imagetabcolors.triggered.connect(metadataError)
         expsessions.triggered.connect(exportError)
         expparameters.triggered.connect(exportError)
         about.triggered.connect(self.aboutAlert)
+        segmentation.triggered.connect(organoidSegmentation)
 
         switchmeta.triggered.connect(testMetadata)
         # Creating and formatting menubar
-        layout.addWidget(menubar)
+        layout.setMenuBar(menubar)
 
         # create analysis parameters box (top left box)
         analysisparam = QGroupBox("Analysis Parameters")
@@ -152,7 +193,6 @@ class MainGUI(QWidget, external_windows):
         grid.addWidget(adjust, 3, 0, 1, 2)
         grid.addWidget(adjustbar, 4, 0, 1, 2)
         analysisparam.setLayout(grid)
-        analysisparam.setFixedSize(140, 180)
         layout.addWidget(analysisparam, 1, 0)
 
         # create image viewing parameters box (bottom left box)
@@ -167,7 +207,6 @@ class MainGUI(QWidget, external_windows):
         image_selection.addWidget(nextimage)
         vertical.addRow(image_selection)
         imageparam.setLayout(vertical)
-        imageparam.setFixedSize(140, 180)
         layout.addWidget(imageparam, 2, 0)
 
         imageparam.setFixedSize(imageparam.minimumSizeHint())
@@ -196,7 +235,7 @@ class MainGUI(QWidget, external_windows):
         self.setLayout(layout)
 
         #mainGUI buttons clicked
-        loadmeta.clicked.connect(lambda: self.file_window_show(sv, mv, adjustbar, slicescrollbar, img_plot))
+        loadmeta.clicked.connect(lambda: self.loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot))
         nextimage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())+1))
         previmage.clicked.connect(lambda: slicescrollbar.setValue(int(slicescrollbar.value())-1) if int(slicescrollbar.value())>0 else None)
         slicescrollbar.valueChanged.connect(lambda: self.img_display(slicescrollbar, img_plot, sv, mv))
@@ -282,14 +321,7 @@ class MainGUI(QWidget, external_windows):
 
     def file_window_show(self, sv, mv, adjustbar, slicescrollbar, img_plot):
         self.metadata_file = str(QFileDialog.getOpenFileName(self, 'Select Metadata file')[0])
-        if self.metadata_file and self.metadata_file.rsplit('.', 1)[-1]=="txt":
-            print(self.metadata_file)
-            adjustbar.setValue(0)
-            slicescrollbar.setValue(0)
-            self.img_display(slicescrollbar, img_plot, sv, mv)
-        else:
-            load_metadata_win=self.buildErrorWindow("Select Valid Metadatafile (.txt)", QMessageBox.Critical)
-            load_metadata_win.exec()
+
 
     def closeEvent(self, event):
         print("closed all windows")

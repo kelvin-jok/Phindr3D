@@ -1,21 +1,4 @@
-# Copyright (C) 2022 Sunnybrook Research Institute
-# This file is part of src <https://github.com/DWALab/Phindr3D>.
-#
-# src is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# src is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with src.  If not, see <http://www.gnu.org/licenses/>.
-
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import matplotlib
 from matplotlib.backend_bases import MouseButton
@@ -236,7 +219,6 @@ class resultsWindow(QDialog):
     def __init__(self):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
-
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -264,9 +246,8 @@ class resultsWindow(QDialog):
         typedropdown.addItem("PCA")
         typedropdown.addItem("t-SNE")
         typedropdown.addItem("Sammon")
-        twod = QRadioButton("2D")
-
-        threed = QRadioButton("3D")
+        twod = QCheckBox("2D")
+        threed = QCheckBox("3D")
         dimensionbox = QGroupBox()
         dimensionboxlayout = QHBoxLayout()
         dimensionboxlayout.addWidget(twod)
@@ -299,7 +280,7 @@ class resultsWindow(QDialog):
         self.original_ylim=0
         self.original_zlim=0
 
-        projection = "2d"  # get from radiobutton
+        projection = "2d"  # update from radiobutton
         def axis_limit(sc_plot):
             xlim = sc_plot.axes.get_xlim3d()
             ylim = sc_plot.axes.get_ylim3d()
@@ -353,8 +334,8 @@ class resultsWindow(QDialog):
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
-        minsize.setHeight(self.minimumSizeHint().height() + 400)
-        minsize.setWidth(self.minimumSizeHint().width() + 400)
+        minsize.setHeight(self.minimumSizeHint().height() + 200)
+        minsize.setWidth(self.minimumSizeHint().width() + 100)
         self.setFixedSize(minsize)
     def reset_view(self):
         print(self.original_xlim, self.original_ylim, self.original_zlim)
