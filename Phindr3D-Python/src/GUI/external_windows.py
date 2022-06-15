@@ -356,8 +356,8 @@ class resultsWindow(QDialog):
             self.feature_file = filename
             print(self.feature_file)
         else:
-            load_metadata_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
-            load_metadata_win.exec()
+            load_featurefile_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
+            load_featurefile_win.exec()
 
     def buildErrorWindow(self, errormessage, icon):
         alert = QMessageBox()
