@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.colors as mcolors
+import pandas as pd
+
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -114,16 +116,12 @@ class pick_onclick():
     def __call__(self, event):
         if event:
             point_index = int(event.ind)
-
             #for debugging
             print("X=",self.x[point_index], " Y=", self.y[point_index], " Z=", self.z[point_index], " PointIdx=", point_index)
 
             plt.figure(1)
             #circle in red selected data point
-            #if self.projection=='2d':
             self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1)
-            #else:
-            #    self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1, depthshade = False)
             self.main_plot.draw()
             winc=self.winc
             winc.show()
@@ -221,6 +219,7 @@ class resultsWindow(QDialog):
     def __init__(self):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
+        self.feature_file=False
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -320,6 +319,7 @@ class resultsWindow(QDialog):
                 self.main_plot.axes.mouse_init()
 
         # button features go here
+        selectfile.clicked.connect(lambda: self.loadFeaturefile())
         twod.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, twod, threed, "2d"))
         threed.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, threed, twod, "3d"))
         twod.setChecked(True)
@@ -349,6 +349,23 @@ class resultsWindow(QDialog):
         self.main_plot.axes.set_zlim3d(self.original_zlim)
         self.main_plot.axes.view_init(azim=-90, elev=89)
         self.main_plot.draw()
+
+    def loadFeaturefile(self):
+        filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
+        if filename != '':
+            self.feature_file = filename
+            print(self.feature_file)
+        else:
+            load_metadata_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
+            load_metadata_win.exec()
+
+    def buildErrorWindow(self, errormessage, icon):
+        alert = QMessageBox()
+        alert.setWindowTitle("Error Dialog")
+        alert.setText(errormessage)
+        alert.setIcon(icon)
+        return alert
+
 
 class paramWindow(QDialog):
     def __init__(self):
@@ -579,25 +596,33 @@ class colorchannelWindow(object):
         win.setLayout(QFormLayout())
         win.layout().addWidget(title)
         self.btn=[]
-        self.btn_grp = QButtonGroup()
-        self.btn_grp.setExclusive(True)
+        btn_grp = QButtonGroup()
+        btn_grp.setExclusive(True)
         self.color=color
 
         for i in range(ch):
             self.btn.append(QPushButton('Channel_' + str(i+1)))
+            #channel button colour is colour of respective channel
             self.btn[i].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[i])*255).astype(int))) +';')
             win.layout().addRow(self.btn[i])
-            self.btn_grp.addButton(self.btn[i], i+1)
-        print(self.btn_grp.buttons())
+            btn_grp.addButton(self.btn[i], i+1)
+        print(btn_grp.buttons())
 
-        self.btn_grp.buttonPressed.connect(self.colorpicker_window)
+        btn_grp.buttonPressed.connect(self.colorpicker_window)
         win.show()
         win.exec()
+
     def colorpicker_window(self, button):
-            #print(button.text())
-            rgb_color = QColorDialog.getColor()
-            self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
-            self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[int(button.text()[-1])-1])*255).astype(int))) +';')
+            #Qt custom Colorpicker. Update channel button and current colour to selected colour. Update channel color list.
+            wincolor=QColorDialog()
+            curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
+            wincolor.setCurrentColor(QColor.fromRgb(curcolor[0], curcolor[1], curcolor[2]))
+            wincolor.exec_()
+            rgb_color = wincolor.selectedColor()
+            if rgb_color.isValid():
+                self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(rgb_color.getRgb()[:-1]) +';')
+                self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
+
 
 class external_windows():
     def buildExtractWindow(self):
@@ -611,5 +636,6 @@ class external_windows():
 
     def buildSegmentationWindow(self):
         return segmentationWindow()
+
     def buildColorchannelWindow(self):
         return colorchannelWindow()
