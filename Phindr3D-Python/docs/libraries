@@ -8,3 +8,4 @@ List of libraries used:
 - sys
 - random
 - sklearn
+- IPython

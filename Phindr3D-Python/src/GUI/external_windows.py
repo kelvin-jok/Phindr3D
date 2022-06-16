@@ -7,8 +7,11 @@ from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from mpl_toolkits.mplot3d import proj3d
 import matplotlib.colors as mcolors
 import pandas as pd
+from mpldatacursor import datacursor
+from mpl_toolkits import mplot3d
 
 
 #Matplotlib Figure
@@ -37,13 +40,15 @@ class NavigationToolbar(NavigationToolbar):
     )
 
 #Callback will open image associated with data point
-class pick_onclick():
-    def __init__(self, main_plot, projection, x, y, z):
+class left_click():
+    def __init__(self, main_plot, plots, projection, x, y, z, labels):
         self.main_plot=main_plot
+        self.plots=plots
         self.projection=projection
         self.x=x
         self.y=y
         self.z=z
+        self.labels=labels
         class buildImageViewer(QWidget):
             def __init__(self):
                 super().__init__()
@@ -112,19 +117,42 @@ class pick_onclick():
                 self.setLayout(grid)
 
         self.winc = buildImageViewer()
-
-    def __call__(self, event):
+    def __call__ (self, event):
         if event:
-            point_index = int(event.ind)
-            #for debugging
-            print("X=",self.x[point_index], " Y=", self.y[point_index], " Z=", self.z[point_index], " PointIdx=", point_index)
+            #https://github.com/matplotlib/matplotlib/issues/ 19735   ---- code below from github open issue. wrong event.ind coordinate not fixed in current version matplotlib...
+            xx = event.mouseevent.x
+            yy = event.mouseevent.y
+            label = event.artist.get_label()
+            label_ind=self.labels.index(label)
 
-            plt.figure(1)
-            #circle in red selected data point
-            self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1)
+            # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+            x2, y2, z2 = proj3d.proj_transform(self.x[label_ind][0], self.y[label_ind][0], self.z[label_ind][0], self.main_plot.axes.get_proj())
+            x3, y3 = self.main_plot.axes.transData.transform((x2, y2))
+            # the distance
+            d = np.sqrt((x3 - xx) ** 2 + (y3 - yy) ** 2)
+
+            # find the closest by searching for min distance.
+            # from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+            imin = 0
+            dmin = 10000000
+            for i in range(len(self.x[label_ind])):
+                # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+                x2, y2, z2 = proj3d.proj_transform(self.x[label_ind][i], self.y[label_ind][i], self.z[label_ind][i], self.main_plot.axes.get_proj())
+                x3, y3 = self.main_plot.axes.transData.transform((x2, y2))
+                # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+                d = np.sqrt((x3 - xx) ** 2 + (y3 - yy) ** 2)
+                # We find the distance and also the index for the closest datapoint
+                if d < dmin:
+                    dmin = d
+                    imin = i
+
+            #print("Xfixed=", self.x[0][imin], " Yfixed=", self.y[0][imin], " Zfixed=", self.z[0][imin], " PointIdxFixed=", imin)
+            self.main_plot.axes.scatter3D(self.x[self.labels.index(label)][imin],
+                                        self.y[self.labels.index(label)][imin],
+                                        self.z[self.labels.index(label)][imin], s=20, facecolor="none",
+                                        edgecolor='red', alpha=1)
+
             self.main_plot.draw()
-            winc=self.winc
-            winc.show()
 
 #zoom in/out fixed xy plane
 class fixed_2d():
@@ -265,22 +293,28 @@ class resultsWindow(QDialog):
         #setup Matplotlib
         matplotlib.use('Qt5Agg')
         # test points. normally empty list x=[], y=[], z=[] #temporary until read in formated super/megavoxel data
-        x = [1, 5]
-        y = [7, 2]
-        z = [0,0]
+        #x = [1, 5]
+        #y = [7, 2]
+        #z = [0,0]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
-        # x=
-        # y=
+        self.x=[]
+        self.y=[]
+        self.z=[]
+        self.labels=[]
+        self.plots=[0,0,0]
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
-        sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False, picker=True)
+        sc_plot = self.main_plot.axes.scatter3D(self.x, self.y, self.z, s=10, alpha=1, depthshade=False, picker=True)
+        #sc_plot = self.main_plot.axes.scatter(self.x, self.y, self.z, s=10, alpha=1, depthshade=False, picker=True)
         self.main_plot.axes.set_position([0, 0, 1, 1])
-        if not x and not y:
+        if not self.x and not self.y:
             self.main_plot.axes.set_ylim(bottom=0)
             self.main_plot.axes.set_xlim(left=0)
         self.original_xlim=0
         self.original_ylim=0
-        if all(np.array(z)==0):
+        if all(np.array(self.z)==0):
             self.original_zlim=[0, 0.1]
+        else:
+            self.original_zlim=sc_plot.axes.get_zlim3d()
 
         projection = "2d"  # update from radiobutton
         def axis_limit(sc_plot):
@@ -300,7 +334,7 @@ class resultsWindow(QDialog):
                 #for debugging
                 #print(low, high)
                 self.main_plot.axes.mouse_init()
-                self.main_plot.axes.view_init(azim=-90, elev=89)
+                self.main_plot.axes.view_init(azim=0, elev=90)
                 if self.original_xlim==0 and self.original_ylim==0 and self.original_zlim==0:
                     self.original_xlim=[low-1, high+1]
                     self.original_ylim=[low - 1, high + 1]
@@ -308,26 +342,30 @@ class resultsWindow(QDialog):
                 self.main_plot.axes.set_ylim(low-1, high+1)
                 self.main_plot.axes.get_zaxis().line.set_linewidth(0)
                 self.main_plot.axes.tick_params(axis='z', labelsize=0)
-                self.main_plot.axes.set_zlim3d(0,0.1)
+                #self.main_plot.axes.set_zlim3d(0,0.1)
                 self.main_plot.draw()
                 self.main_plot.axes.disable_mouse_rotation()
             elif dim == "3d":
                 projection = dim
                 self.main_plot.axes.get_zaxis().line.set_linewidth(1)
+                if self.z:
+                    self.main_plot.axes.set_zlim3d(np.amin(self.z)-1, np.amax(self.z)+1)
                 self.main_plot.axes.tick_params(axis='z', labelsize=10)
                 self.main_plot.fig.canvas.draw()
                 self.main_plot.axes.mouse_init()
 
         # button features go here
         selectfile.clicked.connect(lambda: self.loadFeaturefile())
-        twod.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, twod, threed, "2d"))
-        threed.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, threed, twod, "3d"))
+        twod.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, projection, sc_plot, twod, threed, "2d"))
+        threed.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, projection, sc_plot, threed, twod, "3d"))
         twod.setChecked(True)
         fixed_camera = fixed_2d(self.main_plot, sc_plot, projection)
-        picked=pick_onclick(self.main_plot, projection, x, y, z)
+        magic=left_click(self.main_plot, self.plots, projection, self.x, self.y, self.z, self.labels)
+        #picked=pick_onclick(self.main_plot, self.plots, projection, self.x, self.y, self.z, self.labels)
         # matplotlib callback mouse/scroller actions
         rot =self.main_plot.fig.canvas.mpl_connect('scroll_event', fixed_camera)
-        self.main_plot.fig.canvas.mpl_connect('pick_event', picked)
+        magic=self.main_plot.fig.canvas.mpl_connect('pick_event', magic)
+        #self.main_plot.fig.canvas.mpl_connect('pick_event', picked)
 
         # building layout
         layout = QGridLayout()
@@ -346,8 +384,10 @@ class resultsWindow(QDialog):
         print(self.original_xlim, self.original_ylim, self.original_zlim)
         self.main_plot.axes.set_xlim(self.original_xlim)
         self.main_plot.axes.set_ylim(self.original_ylim)
-        self.main_plot.axes.set_zlim3d(self.original_zlim)
-        self.main_plot.axes.view_init(azim=-90, elev=89)
+        if self.z:
+            self.main_plot.axes.set_zlim3d(np.amin(self.z) - 1, np.amax(self.z) + 1)
+        #self.main_plot.axes.set_zlim3d(self.original_zlim)
+        self.main_plot.axes.view_init(azim=90, elev=90)
         self.main_plot.draw()
 
     def loadFeaturefile(self):
@@ -355,6 +395,7 @@ class resultsWindow(QDialog):
         if filename != '':
             self.feature_file = filename
             print(self.feature_file)
+            self.data_filt()
         else:
             load_featurefile_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
             load_featurefile_win.exec()
@@ -365,6 +406,165 @@ class resultsWindow(QDialog):
         alert.setText(errormessage)
         alert.setIcon(icon)
         return alert
+
+    def data_filt(self):
+        image_feature_data_raw = pd.read_csv(self.feature_file, sep='\t', na_values='        NaN')
+        from IPython.display import display
+        display(image_feature_data_raw)
+
+        # Filter dataframe as needed:
+        #   to filter the dataframe (e.g. to only select orws with specific range of values):
+        #   set filter_data to True below, change FILTER COLUMN to the desired column,
+        #   change FILTER VALUE to the desired value, and check that the operation (==, >, <, <=, >=) is correct.
+        #   copy and paste the indented filter control lines below to add aditional filtering as needed.
+        filter_data = True
+
+        # rescale texture features to the range [0, 1]
+        rescale_texture_features = False
+
+        # choose dataset to use for clustering: EDIT HERE
+        # Choices:
+        # 'MV' -> megavoxel frequencies,
+        # 'text' -> 4 haralick texture features,
+        # 'combined' -> both together
+        datachoice = 'MV'
+
+        if filter_data:
+            df = image_feature_data_raw
+            df.loc[df['Well'].str.contains('c02'), 'Treatment'] = 'DMSO'
+            df.loc[df['Well'].str.contains('c03'), 'Treatment'] = 'MEDIA'
+            df.loc[df['Well'].str.contains('c04'), 'Treatment'] = 'STS'
+            df.loc[df['Well'].str.contains('c05'), 'Treatment'] = 'ABT-263'
+            df.loc[df['Well'].str.contains('c06'), 'Treatment'] = 'A-1331852'
+            df.loc[df['Well'].str.contains('c07'), 'Treatment'] = 'AZD-4320'
+            df.loc[df['Well'].str.contains('c08'), 'Treatment'] = 'ABT-199'
+            df.loc[df['Well'].str.contains('c09'), 'Treatment'] = 'S63415'
+            df.loc[df['Well'].str.contains('c10'), 'Treatment'] = 'S+ABT-263'
+            df.loc[df['Well'].str.contains('c11'), 'Treatment'] = 'S+A-1331852'
+            df.loc[df['Well'].str.contains('c12'), 'Treatment'] = 'S+AZD-4320'
+            df.loc[df['Well'].str.contains('c13'), 'Treatment'] = 'S+ABT-199'
+            #Made up
+            df.loc[df['Well'].str.contains('c19'), 'Treatment'] = 'unknown19'
+            df.loc[df['Well'].str.contains('c20'), 'Treatment'] = 'unknown20'
+            df.loc[df['Well'].str.contains('c21'), 'Treatment'] = 'unknown21'
+            df.loc[df['Well'].str.contains('c22'), 'Treatment'] = 'unknown22'
+
+            wt = df.loc[df['Well'].str.contains('r05')]
+            oneH6 = df.loc[df['Well'].str.contains('r06')]
+            sixG10 = df.loc[df['Well'].str.contains('r07')]
+            #made up
+            sixG10 = df.loc[df['Well'].str.contains('r03')]
+
+            # filter here
+            # documentation on how to filter Pandas dataframes can be found at: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc
+
+            image_feature_data = sixG10
+        else:
+            image_feature_data = image_feature_data_raw
+
+        display(image_feature_data)
+
+        # Identify columns
+        columns = image_feature_data.columns
+        mv_cols = columns[columns.map(lambda col: col.startswith(
+            'MV'))]  # all columns corresponding to megavoxel categories #should usually be -4 since contrast is still included here.
+        texture_cols = columns[columns.map(lambda col: col.startswith('text_'))]
+        featurecols = columns[columns.map(lambda col: col.startswith('MV') or col.startswith('text_'))]
+        mdatacols = columns.drop(featurecols)
+
+        # drop  duplicate data rows:
+        image_feature_data.drop_duplicates(subset=featurecols, inplace=True)
+
+        # remove non-finite/ non-scalar valued rows in both
+        image_feature_data = image_feature_data[np.isfinite(image_feature_data[featurecols]).all(1)]
+        image_feature_data.sort_values(list(featurecols), axis=0, inplace=True)
+
+        # min-max scale all data and split to feature and metadata
+        mind = np.min(image_feature_data[featurecols], axis=0)
+        maxd = np.max(image_feature_data[featurecols], axis=0)
+        featuredf = (image_feature_data[featurecols] - mind) / (maxd - mind)
+        mdatadf = image_feature_data[mdatacols]
+
+        # select data
+        if datachoice.lower() == 'mv':
+            X = featuredf[mv_cols].to_numpy().astype(np.float64)
+        elif datachoice.lower() == 'text':
+            X = featuredf[texture_cols].to_numpy().astype(np.float64)
+        elif datachoice.lower() == 'combined':
+            X = featuredf.to_numpy().astype(np.float64)
+        else:
+            X = featuredf[mv_cols].to_numpy().astype(np.float64)
+            print('Invalid data set choice. Using Megavoxel frequencies.')
+        print('Dataset shape:', X.shape)
+
+        imageIDs = np.array(mdatadf['ImageID'], dtype='object')
+        treatments = np.array(mdatadf['Treatment'], dtype='object')
+        Utreatments = np.unique(treatments)
+        numMVperImg = np.array(image_feature_data['NumMV']).astype(np.float64)
+        y = imageIDs
+        z = treatments
+
+        # misc info
+        num_images_kept = X.shape[0]
+        print(f'\nNumber of images: {num_images_kept}\n')
+
+        print('Treatments found:')
+        print(Utreatments)
+
+        # set colors if needed.
+        if len(Utreatments) > 10:
+            import matplotlib as mpl
+            colors = plt.cm.get_cmap('tab20')(np.linspace(0, 1, 20))
+            mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=colors)
+
+        from IPython.display import display
+        display(featuredf)
+        # display(image_feature_data.describe())
+
+        # PCA kernel function: EDIT HERE
+        # set as 'linear' for linear PCA, 'rbf' for gaussian kernel,
+        # 'sigmoid' for sigmoid kernel,
+        # 'cosine' for cosine kernel
+        func = 'rbf'
+
+        # plot parameters: EDIT HERE
+        title = 'PCA plot'
+        xlabel = 'PCA 1'
+        ylabel = 'PCA 2'
+
+        # makes plot
+        from sklearn.decomposition import PCA, KernelPCA
+        from sklearn.preprocessing import StandardScaler
+
+        sc = StandardScaler()
+        X_show = sc.fit_transform(X)
+        pca = KernelPCA(n_components=3, kernel=func)
+        P = pca.fit(X_show).transform(X_show)
+
+        #self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
+        #sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False, picker=True)
+        self.main_plot.axes.clear()
+        print(np.zeros(len(P)))
+        self.labels.extend(Utreatments)
+        for treat, i in zip(Utreatments,[0,1,2]) :
+            self.x.append(P[z == treat, 0])
+            self.y.append(P[z == treat, 1])
+            self.z.append(P[z == treat, 2])
+
+            #np.zeros(len(P[z == treat, 0]))
+            #self.plots[i]=self.main_plot.axes.scatter(P[z == treat, 0], P[z == treat, 1], P[z == treat, 2] ,label=treat, marker='x', s=10, alpha=0.7, depthshade=False, picker=len(P[z== treat,0])) #picker=True)#, pickradius=0.01)
+            self.plots[i] = self.main_plot.axes.scatter3D(P[z == treat, 0], P[z == treat, 1], P[z == treat, 2], label=treat,
+                                                    s=10, alpha=0.7, depthshade=False,
+                                                    picker=1)  # picker=True)#, pickradius=0.01)
+
+
+        #self.plots[0] = self.main_plot.axes.scatter(self.x, self.y, self.z, label=self.labels,
+        #                                            marker='o', s=10, alpha=1, depthshade=False, picker=True)
+        self.main_plot.axes.legend()
+        self.main_plot.axes.set_title(title)
+        self.main_plot.axes.set_xlabel(xlabel)
+        self.main_plot.axes.set_ylabel(ylabel)
+        self.main_plot.draw()
 
 
 class paramWindow(QDialog):

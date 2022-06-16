@@ -277,13 +277,13 @@ class MainGUI(QWidget, external_windows):
 
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
-            rgb_img = np.empty((rgb_img[0], rgb_img[1], 3, self.ch_len))
+            rgb_img = np.empty((rgb_img[1], rgb_img[0], 3, self.ch_len))
 
             #threshold/colour each image channel
             for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value()+ self.ch_len), color):
                 ch_num=str(ind-slicescrollbar.value()+1)
                 data['Channel_'+ch_num]=data['Channel_'+ch_num].str.replace(r'\\', '/', regex=True)
-                cur_img = np.array(Image.open(data['Channel_'+ch_num].iloc[ind]))
+                cur_img = np.array(Image.open(data['Channel_'+ch_num].iloc[slicescrollbar.value()]))
                 threshold=getImageThreshold(cur_img)
                 cur_img[cur_img<=threshold]=0
                 cur_img= np.dstack((cur_img, cur_img, cur_img))
