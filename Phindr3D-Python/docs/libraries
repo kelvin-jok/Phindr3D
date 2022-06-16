@@ -7,4 +7,9 @@ List of libraries used:
 - scipy
 - sys
 - random
+<<<<<<< HEAD
 - sklearn
+- textwrap
+=======
+- sklearn
+>>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
