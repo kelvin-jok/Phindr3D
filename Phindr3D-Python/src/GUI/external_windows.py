@@ -15,6 +15,7 @@
 # along with src.  If not, see <http://www.gnu.org/licenses/>.
 
 from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from ..Data import *
@@ -67,6 +68,7 @@ class NavigationToolbar(NavigationToolbar):
 class interactive_click():
     def __init__(self, main_plot, plots, projection, x, y, z, labels, feature_file, color):
         self.main_plot=main_plot
+        self.plots=plots
         self.projection=projection
         self.x=x
         self.y=y
@@ -234,7 +236,6 @@ class interactive_click():
             self.main_plot.figure.canvas.draw_idle()
 
             self.buildImageViewer(np.array(self.x),self.labels.index(label),imin,self.color,self.feature_file)
-
 
 #zoom in/out fixed xy plane
 class fixed_2d():
@@ -599,12 +600,11 @@ class resultsWindow(QDialog):
         twod.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, twod, threed, "2d"))
         threed.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, threed, twod, "3d"))
         twod.setChecked(True)
-        fixed_camera = fixed_2d(self.main_plot, sc_plot, self.projection)
-        #klicker = clicker(self.main_plot.axes, ["event"], markers=["x"])
-        #self.main_plot.fig.canvas.mpl_connect('button_press_event', klicker)
-        #self.main_plot.draw()
+        #fixed_camera = fixed_2d(self.main_plot, sc_plot, self.projection)
         picked_pt=interactive_click(self.main_plot, self.plots, self.projection, self.x, self.y, self.z, self.labels, self.feature_file, color)
+        # matplotlib callback mouse/scroller actions
         cid=self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
+
         colordropdown.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, "False", self.projection) if self.feature_file and colordropdown.count()>0 else None)
 
         # building layout
@@ -988,7 +988,6 @@ class segmentationWindow(QDialog):
             newdialog.show()
             newdialog.exec()
 
-
         segmentationsettings.clicked.connect(setSegmentationSettings)
 
         # image boxes
@@ -1012,8 +1011,9 @@ class colorchannelWindow(object):
         win.setWindowTitle("Color Channel Picker")
         title = QLabel("Channels")
         title.setFont(QFont('Arial', 25))
+        title.setAlignment(Qt.AlignCenter)
         win.setLayout(QFormLayout())
-        win.layout().addWidget(title)
+        win.layout().addRow(title)
         self.btn=[]
         btn_grp = QButtonGroup()
         btn_grp.setExclusive(True)
@@ -1029,7 +1029,7 @@ class colorchannelWindow(object):
             win.layout().addRow(self.btn[i])
             btn_grp.addButton(self.btn[i], i+1)
         print(btn_grp.buttons())
-
+        win.layout().addRow(btn_ok, btn_cancel)
         btn_grp.buttonPressed.connect(self.colorpicker_window)
         btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
         btn_cancel.clicked.connect(lambda: win.close())
@@ -1039,14 +1039,18 @@ class colorchannelWindow(object):
     def colorpicker_window(self, button):
             #Qt custom Colorpicker. Update channel button and current colour to selected colour. Update channel color list.
             wincolor=QColorDialog()
-            curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
+            curcolor = (np.array(self.tmp_color[int(button.text()[-1]) - 1]) * 255).astype(int)
+            #curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
             wincolor.setCurrentColor(QColor.fromRgb(curcolor[0], curcolor[1], curcolor[2]))
             wincolor.exec_()
             rgb_color = wincolor.selectedColor()
             if rgb_color.isValid():
                 self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(rgb_color.getRgb()[:-1]) +';')
-                self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
-
+                self.tmp_color[int(button.text()[-1]) - 1] = np.array(rgb_color.getRgb()[:-1]) / 255
+                #self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
+    def confirmed_colors(self, win, color):
+        self.color=self.tmp_color[:]
+        win.close()
 
 class external_windows():
     def buildExtractWindow(self):
