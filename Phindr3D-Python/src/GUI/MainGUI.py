@@ -85,6 +85,7 @@ class MainGUI(QWidget, external_windows):
                     self.metadata.loadMetadataFile(filename)
                     self.metadata_file = filename
                     print(self.metadata_file)
+
                     adjustbar.setValue(0)
                     slicescrollbar.setValue(0)
                     self.img_display(slicescrollbar, img_plot, sv, mv, color, values)
