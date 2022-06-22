@@ -16,39 +16,29 @@
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-<<<<<<< HEAD
 import numpy as np
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.preprocessing import StandardScaler
-=======
 from PyQt5.QtGui import *
 from ..Data import *
->>>>>>> 32fb781... Merged metawork and dev branches (#24)
 import matplotlib
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-<<<<<<< HEAD
 from mpl_toolkits.mplot3d import proj3d
 import matplotlib.colors as mcolors
 import pandas as pd
-<<<<<<< HEAD
 from .analysis_scripts import *
 from PIL import Image
 from textwrap import wrap, fill
-=======
 import matplotlib.colors as mcolors
 import pandas as pd
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
-=======
 from scipy.spatial import distance
 import numpy as np
 from PIL import Image
 import sys
 import os
->>>>>>> 32fb781... Merged metawork and dev branches (#24)
-
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -255,8 +245,6 @@ class interactive_click():
                                         self.z[self.labels.index(label)][imin], s=20, facecolor="none",
                                         edgecolor='red', alpha=1)
 
-<<<<<<< HEAD
-=======
     def __call__(self, event):
         if event:
             point_index = int(event.ind)
@@ -266,7 +254,6 @@ class interactive_click():
             plt.figure(1)
             #circle in red selected data point
             self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1)
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
             self.main_plot.draw()
             self.main_plot.figure.canvas.draw_idle()
 
@@ -522,11 +509,8 @@ class resultsWindow(QDialog):
     def __init__(self, color):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
-<<<<<<< HEAD
         self.feature_file=[]
-=======
         self.feature_file=False
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -639,15 +623,12 @@ class resultsWindow(QDialog):
                 self.data_filt(colordropdown, "False", self.projection)
 
         # button features go here
-<<<<<<< HEAD
         selectfile.clicked.connect(lambda: self.loadFeaturefile(colordropdown))
         twod.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, twod, threed, "2d"))
         threed.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, threed, twod, "3d"))
-=======
         selectfile.clicked.connect(lambda: self.loadFeaturefile())
         twod.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, twod, threed, "2d"))
         threed.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, threed, twod, "3d"))
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
         twod.setChecked(True)
         fixed_camera = fixed_2d(self.main_plot, sc_plot, self.projection)
         #klicker = clicker(self.main_plot.axes, ["event"], markers=["x"])
@@ -1086,7 +1067,6 @@ class colorchannelWindow(object):
         win.setWindowTitle("Color Channel Picker")
         title = QLabel("Channels")
         title.setFont(QFont('Arial', 25))
-<<<<<<< HEAD
         title.setAlignment(Qt.AlignCenter)
         win.setLayout(QFormLayout())
         win.layout().addRow(title)
@@ -1097,14 +1077,12 @@ class colorchannelWindow(object):
         btn_cancel = QPushButton("Cancel")
         self.color=color
         self.tmp_color=color[:]
-=======
         win.setLayout(QFormLayout())
         win.layout().addWidget(title)
         self.btn=[]
         btn_grp = QButtonGroup()
         btn_grp.setExclusive(True)
         self.color=color
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
 
         for i in range(ch):
             self.btn.append(QPushButton('Channel_' + str(i+1)))
@@ -1113,42 +1091,34 @@ class colorchannelWindow(object):
             win.layout().addRow(self.btn[i])
             btn_grp.addButton(self.btn[i], i+1)
         print(btn_grp.buttons())
-<<<<<<< HEAD
+
         win.layout().addRow(btn_ok, btn_cancel)
         btn_grp.buttonPressed.connect(self.colorpicker_window)
         btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
         btn_cancel.clicked.connect(lambda: win.close())
-=======
-
         btn_grp.buttonPressed.connect(self.colorpicker_window)
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
         win.show()
         win.exec()
 
     def colorpicker_window(self, button):
             #Qt custom Colorpicker. Update channel button and current colour to selected colour. Update channel color list.
             wincolor=QColorDialog()
-<<<<<<< HEAD
             curcolor = (np.array(self.tmp_color[int(button.text()[-1]) - 1]) * 255).astype(int)
             #curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
-=======
+
             curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
             wincolor.setCurrentColor(QColor.fromRgb(curcolor[0], curcolor[1], curcolor[2]))
             wincolor.exec_()
             rgb_color = wincolor.selectedColor()
             if rgb_color.isValid():
                 self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(rgb_color.getRgb()[:-1]) +';')
-<<<<<<< HEAD
                 self.tmp_color[int(button.text()[-1]) - 1] = np.array(rgb_color.getRgb()[:-1]) / 255
                 #self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
     def confirmed_colors(self, win, color):
         self.color=self.tmp_color[:]
         win.close()
-=======
-                self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
 
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
+                self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
 
 class external_windows():
     def buildExtractWindow(self):
