@@ -116,12 +116,9 @@ class MainGUI(QWidget, external_windows):
                 metadataError("Set Channel Colors")
             else:
                 prev_color=self.color[:]
-<<<<<<< HEAD
                 win_color=colorchannelWindow(self.ch_len, self.color)
                 self.color=win_color.color
-=======
                 colorchannelWindow(self.ch_len, self.color)
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
                 if np.array_equal(prev_color, self.color)==False:
                     self.img_display(slicescrollbar, img_plot, sv, mv, self.color, values)
 
@@ -292,20 +289,10 @@ class MainGUI(QWidget, external_windows):
             #extract image details from metadata
             data = pd.read_csv(self.metadata_file, sep="\t")
             self.ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
-<<<<<<< HEAD
-<<<<<<< HEAD
             slicescrollbar.setMaximum((data.shape[0]-1))
-<<<<<<< HEAD
-=======
             slicescrollbar.setMaximum((data.shape[0]-1)/(self.ch_len-1))
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
-=======
             slicescrollbar.setMaximum(data.shape[0]-1)
->>>>>>> 32fb781... Merged metawork and dev branches (#24)
-            print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
-=======
             #print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
->>>>>>> 92de1b6... -OK, Cancel in colourpicker
 
             #add/remove colour channels if not default of 3 channels
             if self.ch_len>3 and len(self.color)<self.ch_len:
@@ -320,15 +307,9 @@ class MainGUI(QWidget, external_windows):
 
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
-<<<<<<< HEAD
-<<<<<<< HEAD
             rgb_img = np.empty((rgb_img[1], rgb_img[0], 3, self.ch_len))
-=======
             rgb_img = np.empty((rgb_img[0], rgb_img[1], 3, self.ch_len))
->>>>>>> 27da3f1... Custom Colour Channel picker window and add/remove colour channels from default 3 channels. Adjust GUI buttons for image visualization. (#23)
-=======
             rgb_img = np.empty((rgb_img[1], rgb_img[0], 3, self.ch_len))
->>>>>>> 32fb781... Merged metawork and dev branches (#24)
 
             #threshold/colour each image channel
             for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value()+ self.ch_len), color):
