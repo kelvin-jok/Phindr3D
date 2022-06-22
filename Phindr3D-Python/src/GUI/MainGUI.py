@@ -76,7 +76,7 @@ class MainGUI(QWidget, external_windows):
                 alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
                 alert.exec()
 
-        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot):
+        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot, color, values):
             filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
             if os.path.exists(filename):
                 # When meta data is loaded, using the loaded data, change the data for image viewing
@@ -85,6 +85,7 @@ class MainGUI(QWidget, external_windows):
                     self.metadata.loadMetadataFile(filename)
                     self.metadata_file = filename
                     print(self.metadata_file)
+
                     adjustbar.setValue(0)
                     slicescrollbar.setValue(0)
                     self.img_display(slicescrollbar, img_plot, sv, mv, color, values)
@@ -290,7 +291,7 @@ class MainGUI(QWidget, external_windows):
             data = pd.read_csv(self.metadata_file, sep="\t")
             self.ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
             slicescrollbar.setMaximum((data.shape[0]-1))
-            print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
+            #print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
 
             #add/remove colour channels if not default of 3 channels
             if self.ch_len>3 and len(self.color)<self.ch_len:

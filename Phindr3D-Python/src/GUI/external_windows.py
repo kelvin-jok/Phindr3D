@@ -1045,8 +1045,8 @@ class external_windows():
     def buildExtractWindow(self):
         return extractWindow()
 
-    def buildResultsWindow(self):
-        return resultsWindow()
+    def buildResultsWindow(self, color):
+        return resultsWindow(color)
 
     def buildParamWindow(self):
         return paramWindow()
