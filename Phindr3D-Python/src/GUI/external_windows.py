@@ -17,7 +17,6 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from PyQt5.QtCore import *
 from ..Data import *
 import numpy as np
 from sklearn.decomposition import PCA, KernelPCA
@@ -37,6 +36,7 @@ from PIL import Image
 from textwrap import wrap, fill
 import sys
 import os
+
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -318,7 +318,7 @@ class extractWindow(QDialog):
         largetext = QFont("Arial", 12, 1)
         self.setWindowTitle("Extract Metadata")
         directory = "Image Root Directory"
-        samplefilename = "Sample File Name"
+        self.samplefilename = "Sample File Name"
         layout = QGridLayout()
         imagerootbox = QTextEdit()
         imagerootbox.setReadOnly(True)
@@ -333,7 +333,7 @@ class extractWindow(QDialog):
 
         samplefilebox = QTextEdit()
         samplefilebox.setReadOnly(True)
-        samplefilebox.setPlaceholderText(samplefilename)
+        samplefilebox.setPlaceholderText(self.samplefilename)
         samplefilebox.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         samplefilebox.setFont(largetext)
         samplefilebox.setFixedSize(450, 30)
@@ -381,22 +381,14 @@ class extractWindow(QDialog):
             # replace '?<' patterns with '?P<' to make compatible with re.fullmatch function
             # first checks if '?<' corresponds to a '?<=' or '?<!' pattern first before replacing
             # part of Python specific regular expression syntax
-
-            regexlen = regex.__len__()
-            for i in range(regexlen):
-                if regex[i] == '<':
-                    if i > 0:
-                        if regex[i - 1] == '?':
-                            if i < regexlen - 1:
-                                if regex[i + 1] != '!' and regex[i + 1] != '=':
-                                    regex = regex[:i] + 'P' + regex[i:]
+            regex = DataFunctions.regexPatternCompatibility(regex)
             try:
                 alert = QMessageBox()
                 try:
                     if outputname != "":
-                        created = datas.createMetadata(imagedir, regex, outputname)
+                        created = DataFunctions.createMetadata(imagedir, regex, outputname)
                     else:
-                        created = datas.createMetadata(imagedir, regex)
+                        created = DataFunctions.createMetadata(imagedir, regex)
                     if created:
                         alert.setText("Metadata creation success.")
                         alert.setIcon(QMessageBox.Information)
@@ -417,15 +409,61 @@ class extractWindow(QDialog):
                 alert.setIcon(QMessageBox.Critical)
                 alert.show()
                 alert.exec()
+
         def evalRegex():
             regex = expressionbox.text()
             samplefile = samplefilebox.toPlainText()
-            if regex == "" or samplefile == samplefilename:
+            if regex == "":
+                alert = QMessageBox()
+                alert.setWindowTitle("Error")
+                alert.setText("Please enter a regular expression to evaluate")
+                alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
                 return
-            datas = DataFunctions()
-            regexdict = datas.parseAndCompareRegex(samplefile, regex)
-            if regexdict != None:
-                print(regexdict)
+            if samplefile == "":
+                alert = QMessageBox()
+                alert.setWindowTitle("Error")
+                alert.setText("No sample file was found. Please check the selected image directory.")
+                alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
+                return
+            # replace '?<' patterns with '?P<' to make compatible with re.fullmatch function
+            # first checks if '?<' corresponds to a '?<=' or '?<!' pattern first before replacing
+            # part of Python specific regular expression syntax
+            regex = DataFunctions.regexPatternCompatibility(regex)
+            # parse the sample file with the regular expression to find field values
+            reout = DataFunctions.parseAndCompareRegex(samplefile, regex)
+            # Create the GUI that displays the output
+            winex = QDialog()
+            winex.setWindowTitle("Evaluate Regular Expression")
+            winlayout = QGridLayout()
+            labelText = "Regular Expression Match"
+            # List of regex keys and values
+            relist = QListWidget()
+            if len(reout) == 0:
+                relist.addItem("No results")
+            else:
+                for rekey in reout.keys():
+                    nextline = str(rekey)+" ::: "+str(reout[rekey])
+                    relist.addItem(nextline)
+            # Ok button closes the window
+            reok = QPushButton("Ok")
+            # button behaviour
+            def okPressed():
+                winex.close()
+            reok.clicked.connect(okPressed)
+
+            # add the widgets to the layout
+            winlayout.addWidget(QLabel(labelText))
+            winlayout.addWidget(relist)
+            winlayout.addWidget(reok)
+            # add the layout and show the window
+            winex.setLayout(winlayout)
+            winex.show()
+            winex.exec()
+        #end evalRegex
 
         cancel.clicked.connect(self.close)
         selectimage.clicked.connect(selectImageDir)
@@ -827,7 +865,7 @@ class paramWindow(QDialog):
         trainingimages = QLineEdit()
         trainingimages.setFixedWidth(30)
         usebackground = QCheckBox("Use Background Voxels for comparing") # text is cutoff, don't know actual line?
-        normalise = QCheckBox("Normalise Intesity\n Per Condition")
+        normalise = QCheckBox("Normalise Intensity\n Per Condition")
         trainbycondition = QCheckBox("Train by condition")
         leftdropdown = QComboBox()
         leftdropdown.setEnabled(False)
@@ -925,7 +963,6 @@ class segmentationWindow(QDialog):
             def confirmClicked():
                 # do stuff with the values in the line edits
                 newdialog.close()
-
             def cancelClicked():
                 newdialog.close()
 
@@ -952,6 +989,7 @@ class segmentationWindow(QDialog):
             newdialog.show()
             newdialog.exec()
 
+
         segmentationsettings.clicked.connect(setSegmentationSettings)
 
         # image boxes
@@ -969,14 +1007,12 @@ class segmentationWindow(QDialog):
         self.layout().addWidget(previmage, 3, 1)
         self.layout().addWidget(nextimage, 3, 2)
 
-
 class colorchannelWindow(object):
     def __init__(self, ch, color):
         win = QDialog()
         win.setWindowTitle("Color Channel Picker")
         title = QLabel("Channels")
         title.setFont(QFont('Arial', 25))
-        title.setAlignment(Qt.AlignCenter)
         win.setLayout(QFormLayout())
         win.layout().addWidget(title)
         self.btn=[]
