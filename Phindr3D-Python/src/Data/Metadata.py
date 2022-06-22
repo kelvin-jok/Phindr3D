@@ -85,6 +85,7 @@ class Metadata:
                 channels.append(col)
         # if there are no channels, stack, or imageid, return error
         if channels == [] or ('Stack' not in metadata) or ('ImageID' not in metadata):
+
             raise MissingChannelStackError
         # takes input metadata and stores in a list of tuples, each representing a row of metadata
         for i in range(numrows):
@@ -92,7 +93,11 @@ class Metadata:
             for channel in channels:
                 if os.path.exists(metadata.at[i, channel]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
                     row.append(metadata.at[i, channel])
+                #if old metadatafile is '\' folder separator
+                #if os.path.exists(metadata[channel].str.replace(r'\\', '/', regex=True)[i]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
+                #    row.append(metadata[channel].str.replace(r'\\', '/', regex=True)[i])
                 else:
+                    print(metadata.at[i, channel], "check file name")
                     raise MissingChannelStackError
             # add additional parameter columnlabels, except for channels, stack, metadatafile, and image id
             # these will be ordered at the end, for referencing purposes

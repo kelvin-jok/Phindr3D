@@ -277,7 +277,6 @@ class featurefilegroupingWindow(object):
         ch_title.setFont(QFont('Arial', 10))
         ch_checkbox=QGroupBox()
         ch_checkbox.setFlat(True)
-        ch_list=[]
         ch_vbox = QVBoxLayout()
         ch_vbox.addWidget(ch_title)
 
