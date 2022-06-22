@@ -94,7 +94,8 @@ class MainGUI(QWidget, external_windows):
                 metadataError("Set Channel Colors")
             else:
                 prev_color=self.color[:]
-                colorchannelWindow(self.ch_len, self.color)
+                win_color=colorchannelWindow(self.ch_len, self.color)
+                self.color=win_color.color
                 if np.array_equal(prev_color, self.color)==False:
                     self.img_display(slicescrollbar, img_plot, sv, mv, self.color, values)
 
@@ -135,7 +136,7 @@ class MainGUI(QWidget, external_windows):
             winz.exec()
 
         def viewResults():
-            winc = self.buildResultsWindow()
+            winc = self.buildResultsWindow(self.color)
             winc.show()
             winc.exec()
 
@@ -261,7 +262,7 @@ class MainGUI(QWidget, external_windows):
             #extract image details from metadata
             data = pd.read_csv(self.metadata_file, sep="\t")
             self.ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
-            slicescrollbar.setMaximum((data.shape[0]-1)/(self.ch_len-1))
+            slicescrollbar.setMaximum((data.shape[0]-1))
             print(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()])
 
             #add/remove colour channels if not default of 3 channels
