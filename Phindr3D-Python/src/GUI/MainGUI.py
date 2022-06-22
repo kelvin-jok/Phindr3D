@@ -35,6 +35,7 @@ class MainGUI(QWidget, external_windows):
         """MainGUI constructor"""
         QMainWindow.__init__(self)
         super(MainGUI, self).__init__()
+        self.metadata = Metadata()
         self.metadata_file=False
         self.setWindowTitle("Phindr3D")
         self.image_grid=0
@@ -66,25 +67,49 @@ class MainGUI(QWidget, external_windows):
                 winp = self.buildParamWindow()
                 winp.show()
                 winp.exec()
+            elif buttonPressed == "Set Channel Colors":
+                color = QColorDialog.getColor()
+                return color
 
         def exportError():
             if not self.metadata_file:
                 alert = self.buildErrorWindow("No variables to export!!", QMessageBox.Critical)
                 alert.exec()
 
-        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot, color, values):
+        def loadMetadata(self, sv, mv, adjustbar, slicescrollbar, img_plot):
             filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
-            if filename != '':
-                self.metadata_file=filename
-                print(self.metadata_file)
-                adjustbar.setValue(0)
-                slicescrollbar.setValue(0)
-                self.img_display(slicescrollbar, img_plot, sv, mv, color, values)
+            if os.path.exists(filename):
+                # When meta data is loaded, using the loaded data, change the data for image viewing
+                # Consider adding another class to store all of the data (GUIDATA in MATLab?)
+                try:
+                    self.metadata.loadMetadataFile(filename)
+                    self.metadata_file = filename
+                    print(self.metadata_file)
+                    adjustbar.setValue(0)
+                    slicescrollbar.setValue(0)
+                    self.img_display(slicescrollbar, img_plot, sv, mv, color, values)
+                    # If the file loaded correctly, proceed to calculating thresholds, scale factors, etc.
+                    self.metadata.computeImageParameters()
+                    # Update values of GUI widgets
+
+
+                    alert = self.buildErrorWindow("Metadata Extraction Completed.", QMessageBox.Information, "Notice")
+                    alert.exec()
+
+                except MissingChannelStackError:
+                    errortext = "Metadata Extraction Failed: Channel/Stack/ImageID column(s) missing and/or invalid."
+                    alert = self.buildErrorWindow(errortext, QMessageBox.Critical)
+                    alert.exec()
+                except FileNotFoundError:
+                    alert = self.buildErrorWindow("Metadata Extraction Failed: Metadata file does not exist.")
+                    alert.exec()
             else:
                 load_metadata_win = self.buildErrorWindow("Select Valid Metadatafile (.txt)", QMessageBox.Critical)
+                load_metadata_win.show()
                 load_metadata_win.exec()
                 # When meta data is loaded, using the loaded data, change the data for image viewing
                 # Consider adding another class to store all of the data (GUIDATA in MATLab?)
+
         # metadataError will check if there is metadata. If there is not, create error message.
         # Otherwise, execute button behaviour, depending on button (pass extra parameter to
         # distinguish which button was pressed into metadataError()?)
@@ -109,6 +134,7 @@ class MainGUI(QWidget, external_windows):
         exp = file.addMenu("Export")
         expsessions = exp.addAction("Session")
         expparameters = exp.addAction("Parameters")
+        menuexit = file.addAction("Exit")
 
         metadata = menubar.addMenu("Metadata")
         createmetadata = metadata.addAction("Create Metafile")
@@ -147,7 +173,7 @@ class MainGUI(QWidget, external_windows):
 
         # Function purely for testing purposes, this function will switch 'foundMetadata' to true or false
         def testMetadata():
-            self.metadata_file= not self.metadata_file
+            slicescrollbar.setMaximum(5)
 
         createmetadata.triggered.connect(extractMetadata)
         viewresults.triggered.connect(viewResults)
@@ -157,6 +183,7 @@ class MainGUI(QWidget, external_windows):
         expparameters.triggered.connect(exportError)
         about.triggered.connect(self.aboutAlert)
         segmentation.triggered.connect(organoidSegmentation)
+        menuexit.triggered.connect(self.close)
 
         switchmeta.triggered.connect(testMetadata)
         # Creating and formatting menubar
@@ -308,9 +335,9 @@ class MainGUI(QWidget, external_windows):
             sv.setChecked(False)
             mv.setChecked(False)
 
-    def buildErrorWindow(self, errormessage, icon):
+    def buildErrorWindow(self, errormessage, icon, errortitle="ErrorDialog"):
         alert = QMessageBox()
-        alert.setWindowTitle("Error Dialog")
+        alert.setWindowTitle(errortitle)
         alert.setText(errormessage)
         alert.setIcon(icon)
         return alert

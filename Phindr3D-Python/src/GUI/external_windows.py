@@ -1,9 +1,26 @@
+# Copyright (C) 2022 Sunnybrook Research Institute
+# This file is part of src <https://github.com/DWALab/Phindr3D>.
+#
+# src is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# src is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with src.  If not, see <http://www.gnu.org/licenses/>.
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import numpy as np
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.preprocessing import StandardScaler
+from ..Data import *
 import matplotlib
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
@@ -15,7 +32,7 @@ import pandas as pd
 from .analysis_scripts import *
 from PIL import Image
 from textwrap import wrap, fill
-
+import os
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -175,23 +192,6 @@ class interactive_click():
             #https://github.com/matplotlib/matplotlib/issues/ 19735   ---- code below from github open issue. wrong event.ind coordinate not fixed in current version matplotlib...
             xx = event.mouseevent.x
             yy = event.mouseevent.y
-            '''
-            pointClicked = plt.get(self.main_plot.fig, 'CurrentPoint')
-            print(pointClicked)
-            #d = np.zeros((len(np.array(self.x).ravel()), 1))
-            d=[]
-
-            for i in range(len(self.x.ravel())):
-                a = pointClicked[0] - pointClicked[1];
-                b = [self.x.ravel()[i],self.y.ravel()[i] ,self.z.ravel()[i] ,] - pointClicked[1];
-                d.append(np.norm(np.cross(a, b)) / np.norm(a))
-
-            #d.append(getDistancePointFromLine(pts(i,:), v1, v2))
-            [placeholder, closestIndex] = min(d)
-            print(closestIndex)
-            xx = event.x
-            yy = event.y
-            '''
             label = event.artist.get_label()
             label_ind=self.labels.index(label)
 
@@ -309,11 +309,11 @@ class extractWindow(QDialog):
         largetext = QFont("Arial", 12, 1)
         self.setWindowTitle("Extract Metadata")
         directory = "Image Root Directory"
-        samplefilename = "Sample File Name"
+        self.samplefilename = "Sample File Name"
         layout = QGridLayout()
         imagerootbox = QTextEdit()
         imagerootbox.setReadOnly(True)
-        imagerootbox.setText(directory)
+        imagerootbox.setPlaceholderText(directory)
         imagerootbox.setFixedSize(300, 60)
         imagerootbox.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         imagerootbox.setFont(largetext)
@@ -324,7 +324,7 @@ class extractWindow(QDialog):
 
         samplefilebox = QTextEdit()
         samplefilebox.setReadOnly(True)
-        samplefilebox.setText(samplefilename)
+        samplefilebox.setPlaceholderText(self.samplefilename)
         samplefilebox.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         samplefilebox.setFont(largetext)
         samplefilebox.setFixedSize(450, 30)
@@ -354,8 +354,111 @@ class extractWindow(QDialog):
         cancel.setFixedHeight(30)
 
         # button functions
+        def selectImageDir():
+            imagedir = QFileDialog.getExistingDirectory()
+            if not os.path.exists(imagedir):
+                return
+            imagerootbox.setText(imagedir)
+            # select first '.tif' or '.tiff' file to be sample file
+            for file in os.listdir(imagedir):
+                if file.endswith('.tiff') or file.endswith('.tif'):
+                    samplefilebox.setText(file)
+                    break
+        def createFile():
+            imagedir = imagerootbox.toPlainText()
+            regex = expressionbox.text()
+            outputname = outputfilebox.text()
+            # replace '?<' patterns with '?P<' to make compatible with re.fullmatch function
+            # first checks if '?<' corresponds to a '?<=' or '?<!' pattern first before replacing
+            # part of Python specific regular expression syntax
+            regex = DataFunctions.regexPatternCompatibility(regex)
+            try:
+                alert = QMessageBox()
+                try:
+                    if outputname != "":
+                        created = DataFunctions.createMetadata(imagedir, regex, outputname)
+                    else:
+                        created = DataFunctions.createMetadata(imagedir, regex)
+                    if created:
+                        alert.setText("Metadata creation success.")
+                        alert.setIcon(QMessageBox.Information)
+                        alert.setWindowTitle("Notice")
+                        self.close()
+                    else:
+                        alert.setText("Error: No Regex matches found in selected folder.")
+                        alert.setIcon(QMessageBox.Critical)
+                except MissingChannelStackError:
+                    alert.setText("Error: No Channel and/or Stack groups found in regex.")
+                    alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
+            except WindowsError:
+                alert = QMessageBox()
+                alert.setWindowTitle("Error")
+                alert.setText("No such image directory exists.")
+                alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
+
+        def evalRegex():
+            regex = expressionbox.text()
+            samplefile = samplefilebox.toPlainText()
+            if regex == "":
+                alert = QMessageBox()
+                alert.setWindowTitle("Error")
+                alert.setText("Please enter a regular expression to evaluate")
+                alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
+                return
+            if samplefile == "":
+                alert = QMessageBox()
+                alert.setWindowTitle("Error")
+                alert.setText("No sample file was found. Please check the selected image directory.")
+                alert.setIcon(QMessageBox.Critical)
+                alert.show()
+                alert.exec()
+                return
+            # replace '?<' patterns with '?P<' to make compatible with re.fullmatch function
+            # first checks if '?<' corresponds to a '?<=' or '?<!' pattern first before replacing
+            # part of Python specific regular expression syntax
+            regex = DataFunctions.regexPatternCompatibility(regex)
+            # parse the sample file with the regular expression to find field values
+            reout = DataFunctions.parseAndCompareRegex(samplefile, regex)
+            # Create the GUI that displays the output
+            winex = QDialog()
+            winex.setWindowTitle("Evaluate Regular Expression")
+            winlayout = QGridLayout()
+            labelText = "Regular Expression Match"
+            # List of regex keys and values
+            relist = QListWidget()
+            if len(reout) == 0:
+                relist.addItem("No results")
+            else:
+                for rekey in reout.keys():
+                    nextline = str(rekey)+" ::: "+str(reout[rekey])
+                    relist.addItem(nextline)
+            # Ok button closes the window
+            reok = QPushButton("Ok")
+            # button behaviour
+            def okPressed():
+                winex.close()
+            reok.clicked.connect(okPressed)
+
+            # add the widgets to the layout
+            winlayout.addWidget(QLabel(labelText))
+            winlayout.addWidget(relist)
+            winlayout.addWidget(reok)
+            # add the layout and show the window
+            winex.setLayout(winlayout)
+            winex.show()
+            winex.exec()
+        #end evalRegex
 
         cancel.clicked.connect(self.close)
+        selectimage.clicked.connect(selectImageDir)
+        createfile.clicked.connect(createFile)
+        evaluateexpression.clicked.connect(evalRegex)
 
         layout.addWidget(imagerootbox, 0, 0, 1, 2)
         layout.addWidget(selectimage, 0, 2, 1, 1)
@@ -430,9 +533,6 @@ class resultsWindow(QDialog):
         self.plots=[]
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
         sc_plot = self.main_plot.axes.scatter3D(self.x, self.y, self.z, s=10, alpha=1, depthshade=False)#, picker=True)
-        #box = self.main_plot.axes.get_position()
-        #self.main_plot.axes.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        #sc_plot = self.main_plot.axes.scatter(self.x, self.y, self.z, s=10, alpha=1, depthshade=False, picker=True)
         self.main_plot.axes.set_position([-0.25, 0.1, 1, 1])
         if not self.x and not self.y:
             self.main_plot.axes.set_ylim(bottom=0)
@@ -490,19 +590,10 @@ class resultsWindow(QDialog):
         twod.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, twod, threed, "2d"))
         threed.toggled.connect(lambda: toggle_2d_3d(self.x, self.y, self.z, sc_plot, threed, twod, "3d"))
         twod.setChecked(True)
-        fixed_camera = fixed_2d(self.main_plot, sc_plot, self.projection)
-        #klicker = clicker(self.main_plot.axes, ["event"], markers=["x"])
-        #self.main_plot.fig.canvas.mpl_connect('button_press_event', klicker)
-        #self.main_plot.draw()
+        #fixed_camera = fixed_2d(self.main_plot, sc_plot, self.projection)
         picked_pt=interactive_click(self.main_plot, self.plots, self.projection, self.x, self.y, self.z, self.labels, self.feature_file, color)
-        #picked=pick_onclick(self.main_plot, self.plots, projection, self.x, self.y, self.z, self.labels)
         # matplotlib callback mouse/scroller actions
-        #rot =self.main_plot.fig.canvas.mpl_connect('scroll_event', fixed_camera)
-        #self.main_plot.fig.canvas.mpl_connect('button_press_event', picked_pt)
         cid=self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
-        #self.main_plot.fig.canvas.mpl_disconnect(cid)
-        #self.main_plot.fig.canvas.mpl_connect('pick_event', picked)
-
         colordropdown.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, "False", self.projection) if self.feature_file and colordropdown.count()>0 else None)
 
         # building layout
@@ -762,7 +853,7 @@ class paramWindow(QDialog):
         trainingimages = QLineEdit()
         trainingimages.setFixedWidth(30)
         usebackground = QCheckBox("Use Background Voxels for comparing") # text is cutoff, don't know actual line?
-        normalise = QCheckBox("Normalise Intesity\n Per Condition")
+        normalise = QCheckBox("Normalise Intensity\n Per Condition")
         trainbycondition = QCheckBox("Train by condition")
         leftdropdown = QComboBox()
         leftdropdown.setEnabled(False)
@@ -806,6 +897,8 @@ class paramWindow(QDialog):
             norm = normalise.isChecked()
             conditiontrain = trainbycondition.isChecked()
             # dropdown behaviour goes here <--
+
+            # print statements for testing purposes
             print(superx, supery, superz, svcategories, megax, megay, megaz,
                   mvcategories, voxelnum, trainingnum)
             if bg:
@@ -831,87 +924,77 @@ class segmentationWindow(QDialog):
         super(segmentationWindow, self).__init__()
         self.setWindowTitle("Organoid Segmentation")
         self.setLayout(QGridLayout())
-        title = QLabel("Organoid Segmentation")
-        title.setFont(QFont('Arial', 25))
-        self.layout().addWidget(title)
-        choosemdata = QPushButton("Select Metadata File")
 
-        # Define function for button behaviour (choose metadata file, select channels, choose output
-        # directory, select segmentation channel, loading windows, create directories, TBA)
-        def segment():
-            filename, dump = QFileDialog.getOpenFileName(self, 'Select Metadata File', '', 'Text file (*.txt)')
-            if filename != '':
-                win = QDialog()
-                selectall = QPushButton("Select All")
-                ok = QPushButton("OK")
-                cancel = QPushButton("Cancel")
-                items = ["Channel 1", "Channel 2", "Channel 3", "Well", "Field", "Stack", "Metadata File", "ImageID"]
-                list = QListWidget()
-                for item in items:
-                    list.addItem(item)
-                list.setSelectionMode(QAbstractItemView.MultiSelection)
+        # buttons
+        selectmetadata = QPushButton("Select Metadata File")
+        segmentationsettings = QPushButton("Segmentation Settings")
+        outputpath = QPushButton("Preview/edit output path")
+        segment = QPushButton("Segment")
+        nextimage = QPushButton("Next Image")
+        previmage = QPushButton("Previous Image")
 
-                selectall.clicked.connect(lambda: list.selectAll())
-                cancel.clicked.connect(lambda: win.close())
+        # button functions
+        def setSegmentationSettings():
+            newdialog = QDialog()
+            newdialog.setWindowTitle("Set Segmentation Settings")
+            newdialog.setLayout(QGridLayout())
+            minarea = QLineEdit()
+            intensity = QLineEdit()
+            radius = QLineEdit()
+            smoothing = QLineEdit()
+            scale = QLineEdit()
+            entropy = QLineEdit()
+            maximage = QLineEdit()
+            confirm = QPushButton("Confirm")
+            cancel = QPushButton("Cancel")
 
-                # OK button behaviour: User has made their selection, and thus moves on to next step
-                def okClicked():
-                    win.close()
-                    selected = list.selectedItems()
-                    if selected == []:
-                        print("nothing selected")
-                    else:
-                        outputdirectory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
-                        if outputdirectory != '':
-                            newlist = QListWidget()
-                            for item in items:
-                                newlist.addItem(item)
-                            newlist.setSelectionMode(QAbstractItemView.SingleSelection)
-                            wina = QDialog()
-                            wina.setLayout(QGridLayout())
-                            wina.layout().addWidget(newlist, 0, 0, 2, 2)
-                            secondok = QPushButton("OK")
-                            secondcancel = QPushButton("Cancel")
-                            secondcancel.clicked.connect(lambda: wina.close())
-                            progress = QProgressBar()
-                            # Again, new OK button behaviour: write images, with progress bar to track status
-                            def secondOkClicked():
-                                wina.close()
-                                selecteditem = newlist.selectedItems()
-                                if selecteditem == []:
-                                    print("nothing selected")
-                                else:
-                                    completed = 0
-                                    winb = QDialog()
-                                    winb.setLayout(QGridLayout())
-                                    progress.setFixedSize(500, 20)
-                                    dl = QPushButton("Download")
-                                    winb.layout().addWidget(progress, 0, 0, 2, 2)
-                                    winb.layout().addWidget(dl, 2, 1, 1, 1)
-                                    winb.show()
-                                    while completed < 100:
-                                        completed += 0.0001
-                                        progress.setValue(int(completed))
-                                    winb.exec()
+            def confirmClicked():
+                # do stuff with the values in the line edits
+                newdialog.close()
+            def cancelClicked():
+                newdialog.close()
 
-                            secondok.clicked.connect(lambda: secondOkClicked())
-                            wina.layout().addWidget(secondok, 2, 0, 1, 1)
-                            wina.layout().addWidget(secondcancel, 2, 1, 1, 1)
-                            wina.show()
-                            wina.exec()
+            confirm.clicked.connect(confirmClicked)
+            cancel.clicked.connect(cancelClicked)
 
-                ok.clicked.connect(lambda: okClicked())
+            newdialog.layout().addWidget(QLabel("Min Area Spheroid"), 0, 0, 1, 1)
+            newdialog.layout().addWidget(minarea, 0, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Intensity Threshold"), 1, 0, 1, 1)
+            newdialog.layout().addWidget(intensity, 1, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Radius Spheroid"), 2, 0, 1, 1)
+            newdialog.layout().addWidget(radius, 2, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Smoothing Parameter"), 3, 0, 1, 1)
+            newdialog.layout().addWidget(smoothing, 3, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Scale Spheroid"), 4, 0, 1, 1)
+            newdialog.layout().addWidget(scale, 4, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Entropy Threshold"), 5, 0, 1, 1)
+            newdialog.layout().addWidget(entropy, 5, 1, 1, 1)
+            newdialog.layout().addWidget(QLabel("Max Image Fraction"), 6, 0, 1, 1)
+            newdialog.layout().addWidget(maximage, 6, 1, 1, 1)
+            newdialog.layout().addWidget(confirm, 7, 0, 1, 1)
+            newdialog.layout().addWidget(cancel, 7, 1, 1, 1)
+            newdialog.setFixedSize(newdialog.minimumSizeHint())
+            newdialog.show()
+            newdialog.exec()
 
-                win.setLayout(QGridLayout())
-                win.layout().addWidget(list, 0, 0, 2, 2)
-                win.layout().addWidget(selectall, 2, 0, 1, 2)
-                win.layout().addWidget(ok, 3, 0, 1, 1)
-                win.layout().addWidget(cancel, 3, 1, 1, 1)
-                win.show()
-                win.exec()
 
-        choosemdata.clicked.connect(segment)
-        self.layout().addWidget(choosemdata)
+        segmentationsettings.clicked.connect(setSegmentationSettings)
+
+        # image boxes
+        focusimage = QGroupBox("Focus Image")
+        segmentmap = QGroupBox("Segmentation Map")
+        # put images here
+
+        # add everything to layout
+        self.layout().addWidget(selectmetadata, 0, 0)
+        self.layout().addWidget(segmentationsettings, 1, 0)
+        self.layout().addWidget(outputpath, 2, 0)
+        self.layout().addWidget(segment, 3, 0)
+        self.layout().addWidget(focusimage, 0, 1, 3, 1)
+        self.layout().addWidget(segmentmap, 0, 2, 3, 1)
+        self.layout().addWidget(previmage, 3, 1)
+        self.layout().addWidget(nextimage, 3, 2)
+
 
 class colorchannelWindow(object):
     def __init__(self, ch, color):
@@ -948,14 +1031,12 @@ class colorchannelWindow(object):
             #Qt custom Colorpicker. Update channel button and current colour to selected colour. Update channel color list.
             wincolor=QColorDialog()
             curcolor = (np.array(self.tmp_color[int(button.text()[-1]) - 1]) * 255).astype(int)
-            #curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
             wincolor.setCurrentColor(QColor.fromRgb(curcolor[0], curcolor[1], curcolor[2]))
             wincolor.exec_()
             rgb_color = wincolor.selectedColor()
             if rgb_color.isValid():
                 self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(rgb_color.getRgb()[:-1]) +';')
                 self.tmp_color[int(button.text()[-1]) - 1] = np.array(rgb_color.getRgb()[:-1]) / 255
-                #self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
     def confirmed_colors(self, win, color):
         self.color=self.tmp_color[:]
         win.close()
@@ -964,8 +1045,8 @@ class external_windows():
     def buildExtractWindow(self):
         return extractWindow()
 
-    def buildResultsWindow(self, color):
-        return resultsWindow(color)
+    def buildResultsWindow(self):
+        return resultsWindow()
 
     def buildParamWindow(self):
         return paramWindow()
