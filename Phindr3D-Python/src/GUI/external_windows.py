@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import proj3d
+from matplotlib import rcParams, cycler
 import matplotlib.colors as mcolors
 import pandas as pd
 from .analysis_scripts import *
@@ -72,7 +73,7 @@ class interactive_click():
         self.feature_file=feature_file
         self.color=color
 
-    def buildImageViewer(self, x_data, label, index, color, feature_file):
+    def buildImageViewer(self, x_data, label, cur_label, index, color, feature_file):
 
                 win = QDialog()
                 win.resize(1000, 1000)
@@ -136,11 +137,11 @@ class interactive_click():
 
                 win.setLayout(grid)
 
-                self.channel_display(adjustbar, main_plot, color, x_data, label, index, feature_file, file_info, ch_info)
+                self.channel_display(adjustbar, main_plot, color, x_data, label, cur_label, index, feature_file, file_info, ch_info)
                 win.show()
                 win.exec()
 
-    def channel_display(self, slicescrollbar, img_plot, color, x, label, index, feature_file, file_info, ch_info):
+    def channel_display(self, slicescrollbar, img_plot, color, x, label, cur_label, index, feature_file, file_info, ch_info):
             if feature_file:
                 # extract image details from feature file
                 data = pd.read_csv(feature_file[0], sep="\t", na_values='        NaN')
@@ -152,9 +153,11 @@ class interactive_click():
                 ch_names='<br>'.join(ch_names)
                 ch_info.setText("Channels<br>"+ch_names)
                 slicescrollbar.setMaximum((data.shape[0] - 1))
-
-                if len(np.shape(x))>1:
-                    cur_ind=np.multiply(np.shape(x[:label])[0]-1,np.shape(x[:label])[1]-1)+index
+                if len(self.labels)>1:
+                    if len(np.shape(x))>1:
+                        cur_ind=np.multiply(np.shape(x[:label.index(cur_label)])[0],np.shape(x[:label.index(cur_label)])[1])+index
+                    else:
+                        cur_ind=np.shape(x[:label.index(cur_label)])[0]-1+index
                     slicescrollbar.setValue(cur_ind)
                     file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[cur_ind])
                 else:
@@ -226,7 +229,7 @@ class interactive_click():
             self.main_plot.draw()
             self.main_plot.figure.canvas.draw_idle()
 
-            self.buildImageViewer(np.array(self.x),self.labels.index(label),imin,self.color,self.feature_file)
+            self.buildImageViewer(np.array(self.x),self.labels,label, imin,self.color,self.feature_file)
 
 #zoom in/out fixed xy plane
 class fixed_2d():
@@ -273,6 +276,7 @@ class featurefilegroupingWindow(object):
         ch_vbox.addWidget(ch_title)
 
         for i in range (len(columns)):
+            print(columns[i].find('Channel_'))
             if columns[i].find("Channel_")== 0:
                 ch_label=QLabel(columns[i])
                 ch_vbox.addWidget((ch_label))
@@ -297,7 +301,7 @@ class featurefilegroupingWindow(object):
 
     def selected(self, grp_checkbox, win, groupings):
         for checkbox in grp_checkbox.findChildren(QCheckBox):
-            #print('%s: %s' % (checkbox.text(), checkbox.isChecked()))
+            print('%s: %s' % (checkbox.text(), checkbox.isChecked()))
             if checkbox.isChecked():
                 groupings.append(checkbox.text())
         win.close()
@@ -608,8 +612,8 @@ class resultsWindow(QDialog):
         minsize.setHeight(self.minimumSizeHint().height() + 600)
         minsize.setWidth(self.minimumSizeHint().width() + 600)
         self.setFixedSize(minsize)
-    def reset_view(self): #Not correct at the moment...
-        #print(self.original_xlim, self.original_ylim, self.original_zlim)
+    def reset_view(self):
+        print(self.original_xlim, self.original_ylim, self.original_zlim)
         self.main_plot.axes.set_xlim(self.original_xlim)
         self.main_plot.axes.set_ylim(self.original_ylim)
         if self.z:
@@ -693,10 +697,10 @@ class resultsWindow(QDialog):
         else:
             X = featuredf[mv_cols].to_numpy().astype(np.float64)
             print('Invalid data set choice. Using Megavoxel frequencies.')
-        #print('Dataset shape:', X.shape)
+        print('Dataset shape:', X.shape)
 
         imageIDs = np.array(mdatadf['ImageID'], dtype='object')
-        #print(imageIDs)
+        print(imageIDs)
         z=0
         cat=[1]
         if filter_data!="No Grouping":
@@ -708,14 +712,22 @@ class resultsWindow(QDialog):
 
         # misc info
         num_images_kept = X.shape[0]
-        #print(f'\nNumber of images: {num_images_kept}\n')
+        print(f'\nNumber of images: {num_images_kept}\n')
 
         # set colors if needed.
-        if len(cat) > 10:
+        if len(cat) > 20:
             #if len(Utreatments) > 10:
-            import matplotlib as mpl
-            colors = plt.cm.get_cmap('tab20')(np.linspace(0, 1, 40))
-            mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=colors)
+
+            colors= plt.cm.get_cmap('gist_rainbow')(range(0, 255, int(255/len(cat))))
+            #color1 = plt.cm.get_cmap('tab20b')(np.linspace(0, 1, 20))
+            #color2 = plt.cm.get_cmap('tab20c')(np.linspace(0, 1, 20))
+            #colors = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((color1, color2)))
+            #colors=np.vstack((color1, color2))
+            rcParams['axes.prop_cycle'] = cycler(color=colors)
+        else:
+            color1 = plt.cm.get_cmap('tab20')(np.linspace(0, 1, 20))
+            rcParams['axes.prop_cycle'] = cycler(color=color1)
+
 
         # PCA kernel function: EDIT HERE
         # set as 'linear' for linear PCA, 'rbf' for gaussian kernel,
@@ -764,7 +776,7 @@ class resultsWindow(QDialog):
                     self.z.append(np.zeros(len(self.x[-1])))
 
             self.plots.append(self.main_plot.axes.scatter3D(self.x[-1], self.y[-1], self.z[-1], label=label,
-                             s=10, alpha=0.7, depthshade=False, picker=0.5))
+                             s=10, alpha=0.7, depthshade=False, picker=0.1))
         #legend formating
         cols=2
         bbox=(1.3, 0.75)
@@ -898,8 +910,8 @@ class paramWindow(QDialog):
             # dropdown behaviour goes here <--
 
             # print statements for testing purposes
-            #print(superx, supery, superz, svcategories, megax, megay, megaz,
-            #      mvcategories, voxelnum, trainingnum)
+            print(superx, supery, superz, svcategories, megax, megay, megaz,
+                  mvcategories, voxelnum, trainingnum)
             if bg:
                 print("bg")
             if norm:
@@ -1018,7 +1030,7 @@ class colorchannelWindow(object):
             self.btn[i].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[i])*255).astype(int))) +';')
             win.layout().addRow(self.btn[i])
             btn_grp.addButton(self.btn[i], i+1)
-        #print(btn_grp.buttons())
+        print(btn_grp.buttons())
         win.layout().addRow(btn_ok, btn_cancel)
         btn_grp.buttonPressed.connect(self.colorpicker_window)
         btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
