@@ -152,8 +152,9 @@ class interactive_click():
                 ch_names='<br>'.join(ch_names)
                 ch_info.setText("Channels<br>"+ch_names)
                 slicescrollbar.setMaximum((data.shape[0] - 1))
-                if np.shape(x)[0]>1:
-                    cur_ind=np.multiply(np.shape(x[:label])[0],*np.shape(x[:label][1]))+index
+
+                if len(np.shape(x))>1:
+                    cur_ind=np.multiply(np.shape(x[:label])[0]-1,np.shape(x[:label])[1]-1)+index
                     slicescrollbar.setValue(cur_ind)
                     file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[cur_ind])
                 else:
@@ -272,7 +273,6 @@ class featurefilegroupingWindow(object):
         ch_vbox.addWidget(ch_title)
 
         for i in range (len(columns)):
-            print(columns[i].find('Channel_'))
             if columns[i].find("Channel_")== 0:
                 ch_label=QLabel(columns[i])
                 ch_vbox.addWidget((ch_label))
@@ -297,7 +297,7 @@ class featurefilegroupingWindow(object):
 
     def selected(self, grp_checkbox, win, groupings):
         for checkbox in grp_checkbox.findChildren(QCheckBox):
-            print('%s: %s' % (checkbox.text(), checkbox.isChecked()))
+            #print('%s: %s' % (checkbox.text(), checkbox.isChecked()))
             if checkbox.isChecked():
                 groupings.append(checkbox.text())
         win.close()
@@ -608,8 +608,8 @@ class resultsWindow(QDialog):
         minsize.setHeight(self.minimumSizeHint().height() + 600)
         minsize.setWidth(self.minimumSizeHint().width() + 600)
         self.setFixedSize(minsize)
-    def reset_view(self):
-        print(self.original_xlim, self.original_ylim, self.original_zlim)
+    def reset_view(self): #Not correct at the moment...
+        #print(self.original_xlim, self.original_ylim, self.original_zlim)
         self.main_plot.axes.set_xlim(self.original_xlim)
         self.main_plot.axes.set_ylim(self.original_ylim)
         if self.z:
@@ -693,10 +693,10 @@ class resultsWindow(QDialog):
         else:
             X = featuredf[mv_cols].to_numpy().astype(np.float64)
             print('Invalid data set choice. Using Megavoxel frequencies.')
-        print('Dataset shape:', X.shape)
+        #print('Dataset shape:', X.shape)
 
         imageIDs = np.array(mdatadf['ImageID'], dtype='object')
-        print(imageIDs)
+        #print(imageIDs)
         z=0
         cat=[1]
         if filter_data!="No Grouping":
@@ -708,7 +708,7 @@ class resultsWindow(QDialog):
 
         # misc info
         num_images_kept = X.shape[0]
-        print(f'\nNumber of images: {num_images_kept}\n')
+        #print(f'\nNumber of images: {num_images_kept}\n')
 
         # set colors if needed.
         if len(cat) > 10:
@@ -764,7 +764,7 @@ class resultsWindow(QDialog):
                     self.z.append(np.zeros(len(self.x[-1])))
 
             self.plots.append(self.main_plot.axes.scatter3D(self.x[-1], self.y[-1], self.z[-1], label=label,
-                             s=10, alpha=0.7, depthshade=False, picker=0.1))
+                             s=10, alpha=0.7, depthshade=False, picker=0.5))
         #legend formating
         cols=2
         bbox=(1.3, 0.75)
@@ -898,8 +898,8 @@ class paramWindow(QDialog):
             # dropdown behaviour goes here <--
 
             # print statements for testing purposes
-            print(superx, supery, superz, svcategories, megax, megay, megaz,
-                  mvcategories, voxelnum, trainingnum)
+            #print(superx, supery, superz, svcategories, megax, megay, megaz,
+            #      mvcategories, voxelnum, trainingnum)
             if bg:
                 print("bg")
             if norm:
@@ -1018,7 +1018,7 @@ class colorchannelWindow(object):
             self.btn[i].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[i])*255).astype(int))) +';')
             win.layout().addRow(self.btn[i])
             btn_grp.addButton(self.btn[i], i+1)
-        print(btn_grp.buttons())
+        #print(btn_grp.buttons())
         win.layout().addRow(btn_ok, btn_cancel)
         btn_grp.buttonPressed.connect(self.colorpicker_window)
         btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
