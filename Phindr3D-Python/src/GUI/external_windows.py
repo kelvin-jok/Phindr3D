@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import proj3d
+from matplotlib import rcParams, cycler
 import matplotlib.colors as mcolors
 import pandas as pd
 from .analysis_scripts import *
@@ -72,7 +73,7 @@ class interactive_click():
         self.feature_file=feature_file
         self.color=color
 
-    def buildImageViewer(self, x_data, label, index, color, feature_file):
+    def buildImageViewer(self, x_data, label, cur_label, index, color, feature_file):
 
                 win = QDialog()
                 win.resize(1000, 1000)
@@ -136,11 +137,11 @@ class interactive_click():
 
                 win.setLayout(grid)
 
-                self.channel_display(adjustbar, main_plot, color, x_data, label, index, feature_file, file_info, ch_info)
+                self.channel_display(adjustbar, main_plot, color, x_data, label, cur_label, index, feature_file, file_info, ch_info)
                 win.show()
                 win.exec()
 
-    def channel_display(self, slicescrollbar, img_plot, color, x, label, index, feature_file, file_info, ch_info):
+    def channel_display(self, slicescrollbar, img_plot, color, x, label, cur_label, index, feature_file, file_info, ch_info):
             if feature_file:
                 # extract image details from feature file
                 data = pd.read_csv(feature_file[0], sep="\t", na_values='        NaN')
@@ -152,8 +153,12 @@ class interactive_click():
                 ch_names='<br>'.join(ch_names)
                 ch_info.setText("Channels<br>"+ch_names)
                 slicescrollbar.setMaximum((data.shape[0] - 1))
-                if np.shape(x)[0]>1:
-                    cur_ind=np.multiply(np.shape(x[:label])[0],*np.shape(x[:label][1]))+index
+
+                if len(self.labels)>1:
+                    if len(np.shape(x))>1:
+                        cur_ind=np.multiply(np.shape(x[:label.index(cur_label)])[0],np.shape(x[:label.index(cur_label)])[1])+index
+                    else:
+                        cur_ind=np.shape(x[:label.index(cur_label)])[0]-1+index
                     slicescrollbar.setValue(cur_ind)
                     file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[cur_ind])
                 else:
@@ -225,7 +230,7 @@ class interactive_click():
             self.main_plot.draw()
             self.main_plot.figure.canvas.draw_idle()
 
-            self.buildImageViewer(np.array(self.x),self.labels.index(label),imin,self.color,self.feature_file)
+            self.buildImageViewer(np.array(self.x),self.labels,label, imin,self.color,self.feature_file)
 
 #zoom in/out fixed xy plane
 class fixed_2d():
@@ -711,11 +716,19 @@ class resultsWindow(QDialog):
         print(f'\nNumber of images: {num_images_kept}\n')
 
         # set colors if needed.
-        if len(cat) > 10:
+        if len(cat) > 20:
             #if len(Utreatments) > 10:
-            import matplotlib as mpl
-            colors = plt.cm.get_cmap('tab20')(np.linspace(0, 1, 40))
-            mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=colors)
+
+            colors= plt.cm.get_cmap('gist_rainbow')(range(0, 255, int(255/len(cat))))
+            #color1 = plt.cm.get_cmap('tab20b')(np.linspace(0, 1, 20))
+            #color2 = plt.cm.get_cmap('tab20c')(np.linspace(0, 1, 20))
+            #colors = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((color1, color2)))
+            #colors=np.vstack((color1, color2))
+            rcParams['axes.prop_cycle'] = cycler(color=colors)
+        else:
+            color1 = plt.cm.get_cmap('tab20')(np.linspace(0, 1, 20))
+            rcParams['axes.prop_cycle'] = cycler(color=color1)
+
 
         # PCA kernel function: EDIT HERE
         # set as 'linear' for linear PCA, 'rbf' for gaussian kernel,
