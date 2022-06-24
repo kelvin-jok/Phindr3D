@@ -15,22 +15,28 @@
 # along with src.  If not, see <http://www.gnu.org/licenses/>.
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+import numpy as np
+from sklearn.decomposition import PCA, KernelPCA
+from sklearn.preprocessing import StandardScaler
 from ..Data import *
+from ..Clustering import *
 import matplotlib
 from matplotlib.backend_bases import MouseButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from mpl_toolkits.mplot3d import proj3d
+from matplotlib import rcParams, cycler
 import matplotlib.colors as mcolors
 import pandas as pd
-from scipy.spatial import distance
-import numpy as np
+from .analysis_scripts import *
 from PIL import Image
-import sys
+from textwrap import wrap, fill
+from math import ceil, floor
+from more_itertools import locate
 import os
-
 
 #Matplotlib Figure
 class MplCanvas(FigureCanvasQTAgg):
@@ -57,29 +63,33 @@ class NavigationToolbar(NavigationToolbar):
         ('Save', 'Save the figure', 'filesave', 'save_figure')
     )
 
-#Callback will open image associated with data point
-class pick_onclick():
-    def __init__(self, main_plot, projection, x, y, z):
+#Callback will open image associated with data point. Note: in 3D plot pan is hold left-click swipe, zoom is hold right-click swipe
+class interactive_points():
+    def __init__(self, main_plot, projection, data, labels, feature_file, color, imageID):
         self.main_plot=main_plot
         self.projection=projection
-        self.x=x
-        self.y=y
-        self.z=z
-        class buildImageViewer(QWidget):
-            def __init__(self):
-                super().__init__()
-                self.resize(1000, 1000)
-                self.setWindowTitle("ImageViewer")
+        self.data=data
+        self.labels=labels
+        self.feature_file=feature_file
+        self.color=color
+        self.imageID=imageID
+
+    def buildImageViewer(self, x_data, label, cur_label, index, color, feature_file, imageID):
+
+                win = QDialog()
+                win.resize(1000, 1000)
+                win.setWindowTitle("ImageViewer")
                 grid = QGridLayout()
 
                 #info layout
                 info_box = QVBoxLayout()
-                file_info=QLineEdit("FileName:\n")
+                file_info=QLabel("FileName:")
                 file_info.setAlignment(Qt.AlignTop)
-                file_info.setReadOnly(True)
-                ch_info=QLineEdit("Channels\n")
+                file_info.setStyleSheet("background-color: white")
+                file_info.setWordWrap(True)
+                ch_info=QLabel("Channels\n")
                 ch_info.setAlignment(Qt.AlignTop)
-                ch_info.setReadOnly(True)
+                ch_info.setStyleSheet("background-color: white")
                 file_info.setFixedWidth(200)
                 file_info.setMinimumHeight(350)
                 ch_info.setFixedWidth(200)
@@ -105,12 +115,8 @@ class pick_onclick():
 
                 #image plot layout
                 matplotlib.use('Qt5Agg')
-
                 x = []
                 y = []
-                # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
-                # x=
-                # y=
                 main_plot = MplCanvas(self, width=12, height=12, dpi=100, projection='2d')
                 main_plot.fig.set_facecolor('#f0f0f0')
                 main_plot.axes.scatter(x, y)
@@ -130,45 +136,146 @@ class pick_onclick():
                 grid.addWidget(pjt_box, 1, 1, Qt.AlignCenter)
                 grid.addWidget(adjustbar, 0, 2)
 
-                self.setLayout(grid)
+                win.setLayout(grid)
 
-        self.winc = buildImageViewer()
+                self.channel_display(adjustbar, main_plot, color, x_data, label, cur_label, index, feature_file, file_info, ch_info, imageID)
+                win.show()
+                win.exec()
 
-    def __call__(self, event):
-        if event:
-            point_index = int(event.ind)
-            #for debugging
-            print("X=",self.x[point_index], " Y=", self.y[point_index], " Z=", self.z[point_index], " PointIdx=", point_index)
+    def channel_display(self, slicescrollbar, img_plot, color, x, label, cur_label, index, feature_file, file_info, ch_info, imageID):
+            if feature_file:
+                # extract image details from feature file
+                data = pd.read_csv(feature_file[0], sep="\t", na_values='        NaN')
+                ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
 
-            plt.figure(1)
-            #circle in red selected data point
-            self.main_plot.axes.scatter(self.x[point_index], self.y[point_index], self.z[point_index], s=20, facecolor="none", edgecolor='red', alpha=1)
+                #update info labels
+                ch_names = ['<font color= "#' + str('%02x%02x%02x' % (int(color[i-1][0]*255), int(color[i-1][1]*255), int(color[i-1][2]*255))) + '">' + "Channel_" + str(i) + "</font>" for i in
+                            range(1, ch_len + 1, 1)]
+                ch_names='<br>'.join(ch_names)
+                ch_info.setText("Channels<br>"+ch_names)
+                slicescrollbar.setMaximum((data.shape[0] - 1))
+                if len(self.labels)>1:
+                    cur_ind=list(locate(label, lambda x: x==cur_label))[index]
+                    cur_ind=imageID[cur_ind]-1
+                    slicescrollbar.setValue(cur_ind)
+                    file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[cur_ind])
+                else:
+                    slicescrollbar.setValue(imageID[index]-1)
+                    file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[index])
+
+                # initialize array as image size with # channels
+                rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
+                rgb_img = np.empty((rgb_img[1], rgb_img[0], 3, ch_len))
+
+                # threshold/colour each image channel
+                for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value() + ch_len),color):
+                    ch_num = str(ind - slicescrollbar.value() + 1)
+                    data['Channel_' + ch_num] = data['Channel_' + ch_num].str.replace(r'\\', '/', regex=True)
+                    cur_img = np.array(Image.open(data['Channel_' + ch_num].iloc[slicescrollbar.value()]))
+                    threshold = getImageThreshold(cur_img)
+                    cur_img[cur_img <= threshold] = 0
+                    cur_img = np.dstack((cur_img, cur_img, cur_img))
+                    rgb_img[:, :, :, int(ch_num) - 1] = cur_img * rgb_color
+
+                # compute average and norm to mix colours
+                divisor = np.sum(rgb_img != 0, axis=-1)
+                tot = np.sum(rgb_img, axis=-1)
+                rgb_img = np.divide(tot, divisor, out=np.zeros_like(tot), where=divisor != 0)
+                max_rng = [np.max(rgb_img[:, :, i]) if np.max(rgb_img[:, :, i]) > 0 else 1 for i in range(ch_len)]
+                rgb_img = np.divide(rgb_img, max_rng)
+
+                # plot combined channels
+                img_plot.axes.clear()
+                img_plot.axes.imshow(rgb_img)
+                img_plot.draw()
+
+    def __call__ (self, event): #picker is mouse scroll down trigger
+        if event.mouseevent.inaxes is not None and event.mouseevent.button=="down":
+
+            #https://github.com/matplotlib/matplotlib/issues/ 19735   ---- code below from github open issue. wrong event.ind coordinate not fixed in current version matplotlib...
+            xx = event.mouseevent.x
+            yy = event.mouseevent.y
+            label = event.artist.get_label()
+            label_ind=np.where(np.array(self.labels)==label)
+            # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+            x2, y2, z2 = proj3d.proj_transform(self.data[0][label_ind][0], self.data[1][label_ind][0], self.data[2][label_ind][0], self.main_plot.axes.get_proj())
+            x3, y3 = self.main_plot.axes.transData.transform((x2, y2))
+            # the distance
+            d = np.sqrt((x3 - xx) ** 2 + (y3 - yy) ** 2)
+
+            # find the closest by searching for min distance.
+            # from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+            imin = 0
+            dmin = 10000000
+            for i in range(len(self.data[0][label_ind])):
+                # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+                x2, y2, z2 = proj3d.proj_transform(self.data[0][label_ind][i], self.data[1][label_ind][i], self.data[2][label_ind][i], self.main_plot.axes.get_proj())
+                x3, y3 = self.main_plot.axes.transData.transform((x2, y2))
+                # magic from https://stackoverflow.com/questions/10374930/matplotlib-annotating-a-3d-scatter-plot
+                d = np.sqrt((x3 - xx) ** 2 + (y3 - yy) ** 2)
+                # We find the distance and also the index for the closest datapoint
+                if d < dmin:
+                    dmin = d
+                    imin = i
+            self.main_plot.axes.scatter3D(self.data[0][label_ind][imin],
+                                        self.data[1][label_ind][imin],
+                                        self.data[2][label_ind][imin], s=35, facecolor="none",
+                                        edgecolor='gray', alpha=1)
+
             self.main_plot.draw()
-            winc=self.winc
-            winc.show()
+            self.main_plot.figure.canvas.draw_idle()
+            self.buildImageViewer(self.data[0],self.labels,label, imin,self.color,self.feature_file, self.imageID)
 
-#zoom in/out fixed xy plane
-class fixed_2d():
-    def __init__(self, main_plot, sc_plot, projection):
-        self.main_plot =main_plot
-        self.sc_plot =sc_plot
-        self.projection = projection
+class featurefilegroupingWindow(object):
+    def __init__(self, columns, groupings):
+        win = QDialog()
+        win.setWindowTitle("Filter Feature File Groups and Channels")
+        win.setLayout(QFormLayout())
 
-    def __call__(self, event):
+        grp_title = QLabel("Grouping")
+        grp_title.setFont(QFont('Arial', 10))
+        grp_checkbox=QGroupBox()
+        grp_checkbox.setFlat(True)
+        grp_list=[]
+        grp_vbox = QVBoxLayout()
+        grp_vbox.addWidget(grp_title)
 
-        if event.inaxes is not None:
-            if self.projection=="2d":
-                if event.button == 'up':
-                    self.main_plot.axes.mouse_init()
-                    self.main_plot.axes.xaxis.zoom(-1)
-                    self.main_plot.axes.yaxis.zoom(-1)
-                    self.main_plot.axes.zaxis.zoom(-1)
-                if event.button =='down':
-                    self.main_plot.axes.xaxis.zoom(1)
-                    self.main_plot.axes.yaxis.zoom(1)
-                    self.main_plot.axes.zaxis.zoom(-1)
-                self.main_plot.draw()
-                self.main_plot.axes.disable_mouse_rotation()
+        ch_title = QLabel("Channels")
+        ch_title.setFont(QFont('Arial', 10))
+        ch_checkbox=QGroupBox()
+        ch_checkbox.setFlat(True)
+        ch_vbox = QVBoxLayout()
+        ch_vbox.addWidget(ch_title)
+
+        for i in range (len(columns)):
+            if columns[i].find("Channel_")== 0:
+                ch_label=QLabel(columns[i])
+                ch_vbox.addWidget((ch_label))
+            elif columns[i][:2].find("MV")== -1:
+                grp_list.append(QCheckBox(columns[i]))
+                grp_vbox.addWidget(grp_list[-1])
+
+        grp_vbox.addStretch(1)
+        grp_checkbox.setLayout(grp_vbox)
+
+        ch_vbox.addStretch(1)
+        ch_checkbox.setLayout(ch_vbox)
+
+        win.layout().addRow(grp_checkbox, ch_checkbox)
+
+        ok_button=QPushButton("OK")
+        win.layout().addRow(ok_button)
+        ok_button.clicked.connect(lambda :self.selected(grp_checkbox, win, groupings))
+
+        win.show()
+        win.exec()
+
+    def selected(self, grp_checkbox, win, groupings):
+        for checkbox in grp_checkbox.findChildren(QCheckBox):
+            #print('%s: %s' % (checkbox.text(), checkbox.isChecked()))
+            if checkbox.isChecked():
+                groupings.append(checkbox.text())
+        win.close()
 
 class extractWindow(QDialog):
     def __init__(self):
@@ -338,14 +445,13 @@ class extractWindow(QDialog):
         layout.setSpacing(10)
         self.setLayout(layout)
         self.setFixedSize(self.minimumSizeHint())
-    # end __init__
-# end extractWindow
 
 class resultsWindow(QDialog):
-    def __init__(self):
+    def __init__(self, color):
         super(resultsWindow, self).__init__()
         self.setWindowTitle("Results")
-        self.feature_file=False
+        self.feature_file=[]
+        self.imageIDs=[]
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -369,10 +475,10 @@ class resultsWindow(QDialog):
         box = QGroupBox()
         boxlayout = QGridLayout()
         selectfile = QPushButton("Select Feature File")
-        typedropdown = QComboBox()
-        typedropdown.addItem("PCA")
-        typedropdown.addItem("t-SNE")
-        typedropdown.addItem("Sammon")
+        map_type = QComboBox()
+        map_type.addItem("PCA")
+        map_type.addItem("t-SNE")
+        map_type.addItem("Sammon")
         twod = QCheckBox("2D")
         threed = QCheckBox("3D")
         dimensionbox = QGroupBox()
@@ -383,78 +489,60 @@ class resultsWindow(QDialog):
         colordropdown = QComboBox()
         boxlayout.addWidget(selectfile, 0, 0, 3, 1)
         boxlayout.addWidget(QLabel("Plot Type"), 0, 1, 1, 1)
-        boxlayout.addWidget(typedropdown, 1, 1, 1, 1)
+        boxlayout.addWidget(map_type, 1, 1, 1, 1)
         boxlayout.addWidget(dimensionbox, 2, 1, 1, 1)
         boxlayout.addWidget(QLabel("Color By"), 0, 2, 1, 1)
         boxlayout.addWidget(colordropdown, 1, 2, 1, 1)
         box.setLayout(boxlayout)
+        #menu actions activated
+        inputfile.triggered.connect(lambda: self.loadFeaturefile(colordropdown))
         #setup Matplotlib
         matplotlib.use('Qt5Agg')
-        # test points. normally empty list x=[], y=[], z=[] #temporary until read in formated super/megavoxel data
-        x = [1, 5]
-        y = [7, 2]
-        z = [0,0]
         # if !self.foundMetadata:  #x and y coordinates from super/megavoxels
-        # x=
-        # y=
+        self.plot_data=[]
+        self.labels=[]
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
-        sc_plot = self.main_plot.axes.scatter(x, y, z, s=10, alpha=1, depthshade=False, picker=True)
-        self.main_plot.axes.set_position([0, 0, 1, 1])
-        if not x and not y:
+        sc_plot = self.main_plot.axes.scatter3D([], [], [], s=10, alpha=1, depthshade=False)#, picker=True)
+        self.main_plot.axes.set_position([-0.25, 0.1, 1, 1])
+        if not self.plot_data:
             self.main_plot.axes.set_ylim(bottom=0)
             self.main_plot.axes.set_xlim(left=0)
-        self.original_xlim=0
-        self.original_ylim=0
-        if all(np.array(z)==0):
-            self.original_zlim=[0, 0.1]
-
-        projection = "2d"  # update from radiobutton
-        def axis_limit(sc_plot):
-            xlim = sc_plot.axes.get_xlim3d()
-            ylim = sc_plot.axes.get_ylim3d()
-            lower_lim=min(xlim[0], ylim[0])
-            upper_lim=max(xlim[1], ylim[1])
-            return(lower_lim, upper_lim)
-        def toggle_2d_3d(x, y, z, projection, sc_plot, checkbox_cur, checkbox_prev, dim):
+        self.original_xlim=sc_plot.axes.get_xlim3d()
+        self.original_ylim=sc_plot.axes.get_ylim3d()
+        self.original_zlim=sc_plot.axes.get_zlim3d()
+        self.projection = "2d"  # update from radiobutton
+        def toggle_2d_3d(data, sc_plot, checkbox_cur, checkbox_prev, dim, plot):
             if checkbox_cur.isChecked() and checkbox_prev.isChecked():
                 checkbox_prev.setChecked(False)
-            check_projection(x, y, z, projection, sc_plot, dim)
-        def check_projection(x, y, z, projection, sc_plot, dim):
+            check_projection(data, sc_plot, dim, plot)
+        def check_projection(data, sc_plot, dim, plot):
             if dim == "2d":
-                projection=dim
-                low, high= axis_limit(sc_plot)
-                #for debugging
-                #print(low, high)
+                self.projection=dim
                 self.main_plot.axes.mouse_init()
                 self.main_plot.axes.view_init(azim=-90, elev=89)
-                if self.original_xlim==0 and self.original_ylim==0 and self.original_zlim==0:
-                    self.original_xlim=[low-1, high+1]
-                    self.original_ylim=[low - 1, high + 1]
-                self.main_plot.axes.set_xlim(low-1, high+1)
-                self.main_plot.axes.set_ylim(low-1, high+1)
                 self.main_plot.axes.get_zaxis().line.set_linewidth(0)
                 self.main_plot.axes.tick_params(axis='z', labelsize=0)
-                self.main_plot.axes.set_zlim3d(0,0.1)
                 self.main_plot.draw()
                 self.main_plot.axes.disable_mouse_rotation()
             elif dim == "3d":
-                projection = dim
+                self.projection = dim
                 self.main_plot.axes.get_zaxis().line.set_linewidth(1)
                 self.main_plot.axes.tick_params(axis='z', labelsize=10)
                 self.main_plot.fig.canvas.draw()
                 self.main_plot.axes.mouse_init()
+            if self.feature_file and colordropdown.count()>0:
+                self.data_filt(colordropdown, "False", self.projection, plot, True)
 
         # button features go here
-        selectfile.clicked.connect(lambda: self.loadFeaturefile())
-        twod.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, twod, threed, "2d"))
-        threed.toggled.connect(lambda: toggle_2d_3d(x, y, z, projection, sc_plot, threed, twod, "3d"))
+        selectfile.clicked.connect(lambda: self.loadFeaturefile(colordropdown, map_type.currentText()))
+        twod.toggled.connect(lambda: toggle_2d_3d(self.plot_data, sc_plot, twod, threed, "2d", map_type.currentText()))
+        threed.toggled.connect(lambda: toggle_2d_3d(self.plot_data, sc_plot, threed, twod, "3d", map_type.currentText()))
         twod.setChecked(True)
-        fixed_camera = fixed_2d(self.main_plot, sc_plot, projection)
-        picked=pick_onclick(self.main_plot, projection, x, y, z)
+        picked_pt=interactive_points(self.main_plot, self.projection, self.plot_data, self.labels, self.feature_file, color, self.imageIDs)
         # matplotlib callback mouse/scroller actions
-        rot =self.main_plot.fig.canvas.mpl_connect('scroll_event', fixed_camera)
-        self.main_plot.fig.canvas.mpl_connect('pick_event', picked)
-
+        cid=self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
+        colordropdown.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, "False", self.projection, map_type.currentText(), False) if self.feature_file and colordropdown.count()>0 else None)
+        map_type.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, "False", self.projection, map_type.currentText(), True) if self.feature_file and colordropdown.count() > 0 else None)
         # building layout
         layout = QGridLayout()
         toolbar = NavigationToolbar(self.main_plot, self)
@@ -465,22 +553,24 @@ class resultsWindow(QDialog):
         layout.setMenuBar(menubar)
         self.setLayout(layout)
         minsize = self.minimumSizeHint()
-        minsize.setHeight(self.minimumSizeHint().height() + 400)
-        minsize.setWidth(self.minimumSizeHint().width() + 300)
+        minsize.setHeight(self.minimumSizeHint().height() + 600)
+        minsize.setWidth(self.minimumSizeHint().width() + 600)
         self.setFixedSize(minsize)
     def reset_view(self):
-        print(self.original_xlim, self.original_ylim, self.original_zlim)
-        self.main_plot.axes.set_xlim(self.original_xlim)
-        self.main_plot.axes.set_ylim(self.original_ylim)
+        self.main_plot.axes.set_xlim3d(self.original_xlim)
+        self.main_plot.axes.set_ylim3d(self.original_ylim)
         self.main_plot.axes.set_zlim3d(self.original_zlim)
         self.main_plot.axes.view_init(azim=-90, elev=89)
         self.main_plot.draw()
 
-    def loadFeaturefile(self):
+    def loadFeaturefile(self, grouping, plot):
         filename, dump = QFileDialog.getOpenFileName(self, 'Open File', '', 'Text files (*.txt)')
         if filename != '':
-            self.feature_file = filename
+            self.feature_file.clear()
+            self.feature_file.append(filename)
             print(self.feature_file)
+
+            self.data_filt(grouping, True, self.projection, plot, True)
         else:
             load_featurefile_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
             load_featurefile_win.exec()
@@ -491,7 +581,130 @@ class resultsWindow(QDialog):
         alert.setText(errormessage)
         alert.setIcon(icon)
         return alert
-# end resultsWindow
+
+    def data_filt(self, grouping, load, projection, plot, new_plot): #modified from Phindr...
+        image_feature_data_raw = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
+        if load==True:
+            grouping.blockSignals(True)
+            if grouping.count()>1:
+                grouping.clear()
+            grps=[]
+            featurefilegroupingWindow(image_feature_data_raw.columns, grps)
+            grouping.addItem("No Grouping")
+            for col in grps:
+                grouping.addItem(col)
+            grouping.blockSignals(False)
+        filter_data= grouping.currentText()
+
+        # rescale texture features to the range [0, 1]
+        rescale_texture_features = False
+
+        # choose dataset to use for clustering: EDIT HERE
+        # Choices:
+        # 'MV' -> megavoxel frequencies,
+        # 'text' -> 4 haralick texture features,
+        # 'combined' -> both together
+        datachoice = 'MV'
+        image_feature_data = image_feature_data_raw
+
+        # Identify columns
+        columns = image_feature_data.columns
+        mv_cols = columns[columns.map(lambda col: col.startswith('MV'))]
+        # all columns corresponding to megavoxel categories #should usually be -4 since contrast is still included here.
+        texture_cols = columns[columns.map(lambda col: col.startswith('text_'))]
+        featurecols = columns[columns.map(lambda col: col.startswith('MV') or col.startswith('text_'))]
+        mdatacols = columns.drop(featurecols)
+
+        # drop duplicate data rows:
+        image_feature_data.drop_duplicates(subset=featurecols, inplace=True)
+
+        # remove non-finite/ non-scalar valued rows in both
+        image_feature_data = image_feature_data[np.isfinite(image_feature_data[featurecols]).all(1)]
+        image_feature_data.sort_values(list(featurecols), axis=0, inplace=True)
+
+        # min-max scale all data and split to feature and metadata
+        mind = np.min(image_feature_data[featurecols], axis=0)
+        maxd = np.max(image_feature_data[featurecols], axis=0)
+        featuredf = (image_feature_data[featurecols] - mind) / (maxd - mind)
+        mdatadf = image_feature_data[mdatacols]
+
+        # select data
+        if datachoice.lower() == 'mv':
+            X = featuredf[mv_cols].to_numpy().astype(np.float64)
+        elif datachoice.lower() == 'text':
+            X = featuredf[texture_cols].to_numpy().astype(np.float64)
+        elif datachoice.lower() == 'combined':
+            X = featuredf.to_numpy().astype(np.float64)
+        else:
+            X = featuredf[mv_cols].to_numpy().astype(np.float64)
+            print('Invalid data set choice. Using Megavoxel frequencies.')
+        print('Dataset shape:', X.shape)
+        self.imageIDs.clear()
+        self.imageIDs.extend(np.array(mdatadf['ImageID'], dtype='object').astype(int))
+        z=np.ones(X.shape[0]).astype(int)
+        if filter_data!="No Grouping":
+            z=np.array(mdatadf[filter_data], dtype='object')
+        numMVperImg = np.array(image_feature_data['NumMV']).astype(np.float64)
+        # misc info
+        num_images_kept = X.shape[0]
+        print(f'\nNumber of images: {num_images_kept}\n')
+
+        if new_plot:
+            self.main_plot.axes.clear()
+            dim=int(projection[0])
+            #send to clustering.py for PCA, Sammon, t-SNE analysis
+            title, xlabel, ylabel, P=plot_type(X, dim, plot)
+            self.plot_data.clear()
+
+            #save new x, y, z data and plot
+            self.plot_data.append(P[:,0])
+            self.plot_data.append(P[:,1])
+            if dim==3:
+                self.plot_data.append(P[:, 2])
+            else:
+                self.plot_data.append(np.zeros(len(self.plot_data[-1])))
+        else:
+            for artist in self.main_plot.axes.collections:
+                artist.remove()
+        self.labels.clear()
+        self.labels.extend(list(map(str, z)))
+        #plot data
+        colors= plt.cm.get_cmap('gist_ncar')(range(0, 255, floor(255/len(np.unique(self.labels)))))
+        plots=[]
+        if len(np.unique(self.labels))>1:
+            for label, i in zip(np.unique(self.labels), range(len(np.unique(self.labels)))):
+                plots.append(self.main_plot.axes.scatter3D(self.plot_data[0][np.array(self.labels)==label], self.plot_data[1][np.array(self.labels)==label], self.plot_data[2][np.array(self.labels)==label], label=label,
+                             s=10, alpha=1, color=[colors[i]], depthshade=False, picker=0.1, cmap=colors))
+        else:
+            plots.append(self.main_plot.axes.scatter3D(self.plot_data[0], self.plot_data[1], self.plot_data[2], label=self.labels[0],
+                                              s=10, alpha=1, color=[colors[0]], depthshade=False, picker=0.1, cmap=colors))
+        #legend formating
+        cols=2
+        bbox=(1.3, 0.75)
+        text=""
+        handle=[matplotlib.patches.Patch(color=colour, label=label) for label, colour in zip(self.labels, colors)]
+        #increase legend columns if too many labels
+        if len(self.labels)>1:
+            text=max(self.labels, key = len)
+        if len(np.unique(self.labels))>40:
+            cols=cols + ceil(len(np.unique(self.labels))/40)
+            bbox=(1.6, 0.5)
+        #textwrap if longer than 10 characters
+        if len(text)>10:
+            labels = [fill(l, 20) for l in np.unique(self.labels)]
+            self.main_plot.axes.legend(handle, labels, bbox_to_anchor=bbox, ncol=cols,loc='center right')
+        else:
+            self.main_plot.axes.legend(handle, np.unique(self.labels),bbox_to_anchor=bbox, ncol=cols,loc='center right')
+        if new_plot:
+            self.main_plot.axes.set_title(title)
+            self.main_plot.axes.set_xlabel(xlabel)
+            self.main_plot.axes.set_ylabel(ylabel)
+            #save original x,y,z axis limits for resetview
+            for plot in plots:
+                self.original_xlim=[min(plot.axes.get_xlim3d()[0], self.original_xlim[0]), max(plot.axes.get_xlim3d()[1], self.original_xlim[1])]
+                self.original_ylim=[min(plot.axes.get_ylim3d()[0], self.original_ylim[0]), max(plot.axes.get_ylim3d()[1], self.original_ylim[1])]
+                self.original_zlim=[min(plot.axes.get_zlim3d()[0], self.original_zlim[0]), max(plot.axes.get_zlim3d()[1], self.original_zlim[1])]
+        self.main_plot.draw()
 
 class paramWindow(QDialog):
     def __init__(self):
@@ -616,7 +829,6 @@ class paramWindow(QDialog):
                 print("norm")
             if conditiontrain:
                 print("conditiontrain")
-
             self.close()
 
         done.clicked.connect(donePressed)
@@ -704,18 +916,23 @@ class segmentationWindow(QDialog):
         self.layout().addWidget(previmage, 3, 1)
         self.layout().addWidget(nextimage, 3, 2)
 
+
 class colorchannelWindow(object):
     def __init__(self, ch, color):
         win = QDialog()
         win.setWindowTitle("Color Channel Picker")
         title = QLabel("Channels")
         title.setFont(QFont('Arial', 25))
+        title.setAlignment(Qt.AlignCenter)
         win.setLayout(QFormLayout())
-        win.layout().addWidget(title)
+        win.layout().addRow(title)
         self.btn=[]
         btn_grp = QButtonGroup()
         btn_grp.setExclusive(True)
+        btn_ok= QPushButton("OK")
+        btn_cancel = QPushButton("Cancel")
         self.color=color
+        self.tmp_color=color[:]
 
         for i in range(ch):
             self.btn.append(QPushButton('Channel_' + str(i+1)))
@@ -723,30 +940,33 @@ class colorchannelWindow(object):
             self.btn[i].setStyleSheet('background-color: rgb' +str(tuple((np.array(self.color[i])*255).astype(int))) +';')
             win.layout().addRow(self.btn[i])
             btn_grp.addButton(self.btn[i], i+1)
-        print(btn_grp.buttons())
-
+        win.layout().addRow(btn_ok, btn_cancel)
         btn_grp.buttonPressed.connect(self.colorpicker_window)
+        btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
+        btn_cancel.clicked.connect(lambda: win.close())
         win.show()
         win.exec()
 
     def colorpicker_window(self, button):
             #Qt custom Colorpicker. Update channel button and current colour to selected colour. Update channel color list.
             wincolor=QColorDialog()
-            curcolor=(np.array(self.color[int(button.text()[-1])-1])*255).astype(int)
+            curcolor = (np.array(self.tmp_color[int(button.text()[-1]) - 1]) * 255).astype(int)
             wincolor.setCurrentColor(QColor.fromRgb(curcolor[0], curcolor[1], curcolor[2]))
             wincolor.exec_()
             rgb_color = wincolor.selectedColor()
             if rgb_color.isValid():
                 self.btn[int(button.text()[-1])-1].setStyleSheet('background-color: rgb' +str(rgb_color.getRgb()[:-1]) +';')
-                self.color[int(button.text()[-1])-1] = np.array(rgb_color.getRgb()[:-1])/255
-
+                self.tmp_color[int(button.text()[-1]) - 1] = np.array(rgb_color.getRgb()[:-1]) / 255
+    def confirmed_colors(self, win, color):
+        self.color=self.tmp_color[:]
+        win.close()
 
 class external_windows():
     def buildExtractWindow(self):
         return extractWindow()
 
-    def buildResultsWindow(self):
-        return resultsWindow()
+    def buildResultsWindow(self, color):
+        return resultsWindow(color)
 
     def buildParamWindow(self):
         return paramWindow()
@@ -756,4 +976,3 @@ class external_windows():
 
     def buildColorchannelWindow(self):
         return colorchannelWindow()
-
