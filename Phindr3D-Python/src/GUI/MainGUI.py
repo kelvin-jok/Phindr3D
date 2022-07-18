@@ -26,6 +26,8 @@ import numpy as np
 from PIL import Image
 import sys
 import random
+from .windows.plot_functions import *
+from .windows.helperclasses import *
 
 
 class MainGUI(QWidget, external_windows):
@@ -138,7 +140,7 @@ class MainGUI(QWidget, external_windows):
                 metadataError("Set Channel Colors")
             else:
                 prev_color=self.color[:]
-                win_color=colorchannelWindow(self.ch_len, self.color)
+                win_color=colorchannelWindow(self.ch_len, self.color, "Color Channel Picker", "Channels", ['Channel_' + str(i) for i in range(1,self.ch_len+1)])
                 self.color=win_color.color
                 if np.array_equal(prev_color, self.color)==False:
                     self.img_display(slicescrollbar, img_plot, sv, mv, self.color, values)
@@ -258,7 +260,7 @@ class MainGUI(QWidget, external_windows):
 
         matplotlib.use('Qt5Agg')
 
-        img_plot = MplCanvas(self, width=25, height=25, dpi=300, projection="2d") #inches=pixel*0.0104166667
+        img_plot = MplCanvas(self, width=10, height=10, dpi=300, projection="2d") #inches=pixel*0.0104166667
         img_plot.axes.imshow(np.zeros((2000,2000)), cmap = mcolors.ListedColormap("black"))
         img_plot.fig.set_facecolor("black")
         imagelayout = QVBoxLayout()
@@ -334,8 +336,10 @@ class MainGUI(QWidget, external_windows):
 
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[slicescrollbar.value()]).size
-            rgb_img = np.empty((rgb_img[1], rgb_img[0], 3, self.ch_len))
+            rgb_img = np.empty((self.ch_len, rgb_img[1], rgb_img[0], 3))
 
+            self.rgb_img=merge_channels(data, rgb_img, self.ch_len, slicescrollbar, color, 0, False)
+            '''
             #threshold/colour each image channel
             for ind, rgb_color in zip(range(slicescrollbar.value(), slicescrollbar.value()+ self.ch_len), color):
                 ch_num=str(ind-slicescrollbar.value()+1)
@@ -347,15 +351,14 @@ class MainGUI(QWidget, external_windows):
                 threshold=getImageThreshold(cur_img)
                 cur_img[cur_img<=threshold]=0
                 cur_img= np.dstack((cur_img, cur_img, cur_img))
-                rgb_img[:, :, :, int(ch_num) - 1] = cur_img*rgb_color
-
-            #compute average and norm to mix colours
-            divisor=np.sum(rgb_img!= 0, axis=-1)
-            tot = np.sum(rgb_img, axis=-1)
+                rgb_img[int(ch_num) - 1, :, :, :] = np.multiply(cur_img, rgb_color)
+            # compute average and norm to mix colours
+            divisor = np.sum(rgb_img != 0, axis=0)
+            tot = np.sum(rgb_img, axis=0)
             rgb_img=np.divide(tot, divisor, out=np.zeros_like(tot), where=divisor != 0)
             max_rng=[np.max(rgb_img[:,:,i]) if np.max(rgb_img[:,:,i])>0 else 1 for i in range(self.ch_len)]
             self.rgb_img = np.divide(rgb_img,max_rng)
-
+            '''
             #plot combined channels
             img_plot.axes.clear()
             img_plot.axes.imshow(self.rgb_img)
