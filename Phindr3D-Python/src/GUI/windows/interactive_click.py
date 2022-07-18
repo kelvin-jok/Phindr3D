@@ -224,8 +224,7 @@ class interactive_points():
         start = time.time()
         img_plot.fig.subplots_adjust(wspace=0.0075, hspace=0.0075)
         img_plot.draw()
-        end = time.time()
-        print("Done")
+
     def __call__ (self, event): #picker is right-click activation
         if event.mouseevent.inaxes is not None and event.mouseevent.button is MouseButton.RIGHT:
             #https://github.com/matplotlib/matplotlib/issues/ 19735   ---- code below from github open issue. wrong event.ind coordinate not fixed in current version matplotlib...
