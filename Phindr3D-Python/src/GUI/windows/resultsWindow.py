@@ -16,6 +16,7 @@ from .featurefilegroupingwindow import featurefilegroupingWindow
 from textwrap import wrap, fill
 from .helperclasses import MplCanvas
 from ... Clustering import *
+from .colorchannelWindow import *
 
 class resultsWindow(QDialog):
     def __init__(self, color):
@@ -49,6 +50,7 @@ class resultsWindow(QDialog):
         selectfile = QPushButton("Select Feature File")
         prevdata = QPushButton("Import Previous Plot Data")
         exportdata = QPushButton("Export Plot Data")
+        cmap=QPushButton("Legend Colours")
         map_type = QComboBox()
         map_type.addItem("PCA")
         map_type.addItem("t-SNE")
@@ -66,6 +68,7 @@ class resultsWindow(QDialog):
         boxlayout.addWidget(QLabel("Plot Type"), 0, 1, 1, 1)
         boxlayout.addWidget(map_type, 1, 1, 1, 1)
         boxlayout.addWidget(dimensionbox, 2, 1, 1, 1)
+        boxlayout.addWidget(cmap, 3, 1, 1, 1)
         boxlayout.addWidget(QLabel("Color By"), 0, 2, 1, 1)
         boxlayout.addWidget(colordropdown, 1, 2, 1, 1)
         boxlayout.addWidget(prevdata, 2, 2, 1, 1)
@@ -117,6 +120,7 @@ class resultsWindow(QDialog):
 
         # button features and callbacks
         selectfile.clicked.connect(lambda: self.loadFeaturefile(colordropdown, map_type.currentText(), True))
+        cmap.clicked.connect(lambda: self.legend_colors() if len(self.labels)>0 else None)
         twod.toggled.connect(lambda: toggle_2d_3d(twod, threed, "2d", map_type.currentText()))
         threed.toggled.connect(lambda: toggle_2d_3d(threed, twod, "3d", map_type.currentText()))
         twod.setChecked(True)
@@ -166,8 +170,8 @@ class resultsWindow(QDialog):
         image_feature_data_raw = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
         if load==True:
             grouping.blockSignals(True)
-            if grouping.count()>1:
-                grouping.clear()
+            #if grouping.count()>1:
+            grouping.clear()
             grps=[]
             featurefilegroupingWindow(image_feature_data_raw.columns, grps)
             grouping.addItem("No Grouping")
@@ -228,9 +232,8 @@ class resultsWindow(QDialog):
         # misc info
         num_images_kept = X.shape[0]
         print(f'\nNumber of images: {num_images_kept}\n')
-
+        self.main_plot.axes.clear()
         if new_plot:
-            self.main_plot.axes.clear()
             dim=int(projection[0])
             #send to clustering.py for PCA, Sammon, t-SNE analysis
             title, xlabel, ylabel, P=plot_type(X, dim, plot)
@@ -242,12 +245,6 @@ class resultsWindow(QDialog):
                 self.plot_data.append(P[:, 2])
             else:
                 self.plot_data.append(np.zeros(len(self.plot_data[-1])))
-        else:
-            old_plots=self.plots[:]
-            for plots in old_plots:
-                plots.remove()
-            for artist in self.main_plot.axes.collections:
-                artist.remove()
         del self.plots[:]
         self.labels.clear()
         self.labels.extend(list(map(str, z)))
@@ -286,6 +283,23 @@ class resultsWindow(QDialog):
             self.original_ylim=[self.plots[-1].axes.get_ylim3d()[0], self.plots[-1].axes.get_ylim3d()[1]]
             self.original_zlim=[self.plots[-1].axes.get_zlim3d()[0], self.plots[-1].axes.get_zlim3d()[1]]
         self.main_plot.draw()
+    def legend_colors(self):
+        map_colors = plt.cm.get_cmap('gist_ncar')(range(0, 255, floor(255 / len(np.unique(self.labels)))))
+        map_colors= [col[0:3] for col in map_colors]
+        colors = colorchannelWindow(len(np.unique(self.labels)), map_colors, "Custom Colour Picker", "Labels",
+                                       np.unique(self.labels))
+        if map_colors!=colors:
+            colors=colors.color
+            legend = self.main_plot.axes.get_legend()
+            if len(np.unique(self.labels))>1:
+                for i in range(len(np.unique(self.labels))):
+                    self.plots[i].set_color(colors[i])
+                    legend.legendHandles[i].set_color(colors[i])
+            else:
+                self.plots[0].set_color(colors[0])
+                legend.legendHandles[0].set_color(colors[0])
+            self.main_plot.draw()
+
     #export current plot data
     def save_file(self, map):
         name = QFileDialog.getSaveFileName(self, 'Save File')[0]
@@ -304,21 +318,23 @@ class resultsWindow(QDialog):
         if filename != '':
             print(filename)
             new_data = np.loadtxt(filename)
+            #get x, y, z limits
             self.original_xlim =[new_data[-6],new_data[-5]]
             self.original_ylim = [new_data[-4], new_data[-3]]
             self.original_zlim = [new_data[-2], new_data[-1]]
             self.reset_view()
-            map=""
+            #2d/3d set
             if np.all(new_data[int((len(new_data)-6)/3):-6])!=0:
                 threed.setChecked(True)
             else:
                 twod.setChecked(True)
+            #imported data and set map type
             self.plot_data.clear()
             self.plot_data.extend(np.array(new_data[:-6].reshape(3, int((len(new_data)-6)/3))))
-            for x in ["PCA", "Sammon", "t-SNE"]:
-                if x in filename:
-                    map=x
+            for map in ["PCA", "Sammon", "t-SNE"]:
+                if map in filename:
                     map_dropdown.setCurrentIndex(map_dropdown.findText(map))
+                    #load feature file
                     self.loadFeaturefile(colordropdown, map, False)
                     break
         else:
