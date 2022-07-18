@@ -15,7 +15,6 @@ from more_itertools import locate
 from PIL import Image
 from ..analysis_scripts import *
 from .helperclasses import MplCanvas
-from numba import jit
 
 #Callback will open image associated with data point. Note: in 3D plot pan is hold left-click swipe, zoom is hold right-click swipe
 #Matplotlib Figure
@@ -96,7 +95,6 @@ class interactive_points():
                 pjt_box.setLayout(pjt_type)
 
                 #image plot layout
-                #matplotlib.use('Qt5Agg')
                 x = []
                 y = []
                 main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection='2d')
@@ -224,8 +222,7 @@ class interactive_points():
         start = time.time()
         img_plot.fig.subplots_adjust(wspace=0.0075, hspace=0.0075)
         img_plot.draw()
-        end = time.time()
-        print("Done")
+
     def __call__ (self, event): #picker is right-click activation
         if event.mouseevent.inaxes is not None and event.mouseevent.button is MouseButton.RIGHT:
             #https://github.com/matplotlib/matplotlib/issues/ 19735   ---- code below from github open issue. wrong event.ind coordinate not fixed in current version matplotlib...
