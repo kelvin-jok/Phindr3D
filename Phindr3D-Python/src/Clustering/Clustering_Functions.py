@@ -22,15 +22,17 @@ from ..GUI.windows.helperclasses import *
 from PyQt5.QtWidgets import *
 import matplotlib
 import scipy as sc
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
 
 class clusterdisplay(object):
     def __init__(self, x, y, xp, yp, win_title, xlabel, ylabel, opt_label, text, num):
         #main layout
         win = QDialog()
         win.setWindowTitle(win_title)
+        win.setLayout(QGridLayout())
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="2d")
         if num==0:
-            sc_plot = self.main_plot.axes.plot(x, y)
+            sc_plot = self.main_plot.axes.plot(x, y, 'r--')
             self.main_plot.axes.set_title(win_title)
             self.main_plot.axes.set_xlabel(xlabel)
             self.main_plot.axes.set_ylabel(ylabel)
@@ -43,7 +45,12 @@ class clusterdisplay(object):
             self.main_plot.axes.set_ylabel(ylabel)
             self.main_plot.axes.text(text[0], text[1], text[2])
             self.main_plot.axes.legend()
-
+        self.main_plot.draw()
+        toolbar = NavigationToolbar(self.main_plot, win)
+        win.layout().addWidget(toolbar)
+        win.layout().addWidget(self.main_plot)
+        win.show()
+        win.exec()
 class ClusteringFunc:
     """Static methods for cluster analysis. Referenced from
     https://github.com/DWALab/Phindr3D/tree/9b95aebbd2a62c41d3c87a36f1122a78a21019c8/Lib
@@ -338,6 +345,7 @@ class ClusteringFunc:
             % software may be freely used and distributed for
             % non-commercial purposes.
             """
+
             if len(s.shape) != 2:
                 print('\nError: s shuld be a 2d matrix\n')
                 return None
@@ -439,7 +447,7 @@ class ClusteringFunc:
             C.S = sim  # similarity matrix
             return C
 
-        def apcluster_sparse(s, p, maxits=500, convits=50, dampfact=0.5, plot=False, details=False, nonoise=False):
+        def apcluster_sparse(s, p, maxits=500, convits=50, dampfact=0.5, plot=False, details=False, nonoise=False):#plot=False, details=False, nonoise=False):
             """
             %
             % APCLUSTER uses affinity propagation (Frey and Dueck, Science,
@@ -721,17 +729,9 @@ class ClusteringFunc:
                     netsim[i] = tmpnetsim
                     tmp = np.arrange(0, i)
                     tmpi = np.nonzero(np.isfinite(netsim[:i]))
-                    #replace matplotlib
+                    #matplotlib
                     matplotlib.use('Qt5Agg')
                     winc = clusterdisplay(tmp[tmpi], netsim[tmpi], None, None, 'ap_cluster_sparse' '# iterations', 'Net similarity of quantized intermediate solutions', None, None, 0)
-                    winc.show()
-                    winc.exec()
-                    #plt.figure()
-
-                    #plt.plot(tmp[tmpi], netsim[tmpi])
-                    #plt.xlabel('# iterations')
-                    #plt.ylabel('Net similarity of quantized intermediate solutions')
-                    #plt.show()
             # identify exemplars
             E = ((A[M - N:M] + R[M - N:M]) > 0)
             K = np.sum(E)
@@ -803,9 +803,9 @@ class ClusteringFunc:
                     f'\tAdd noise to similarities to remove degeneracies. To monitor thhe similarity, activate plotting.')
                 print(f'also consider increasing maxits and if necessary dampfact')
             return idx, netsim, dpsim, expref
-
-        def apcluster(s, p, sparse=False, maxits=500, convits=50, dampfact=0.5, plot=False, details=False,
-                      nonoise=False):
+        #https://www.mathworks.com/matlabcentral/mlc-downloads/downloads/submissions/14620/versions/4/previews/apcluster.m/index.html
+        #https://www.mathworks.com/matlabcentral/fileexchange/25722-fast-affinity-propagation-clustering-under-given-number-of-clusters?tab=discussions
+        def apcluster(s, p, sparse=False, maxits=500, convits=50, dampfact=0.5, plot=False, details=False,nonoise=False):#maxits=500,convits=50, dampfact=0.5,  plot=False, details=False,nonoise=False):
             """in third party/clustering"""
             """
             s = similarities
@@ -1044,7 +1044,6 @@ class ClusteringFunc:
                     A[k, k] = dA[k]
                 # damping
                 A = (1 - lam) * A + lam * Aold
-
                 # check for convergence
                 E = ((np.diag(A) + np.diag(R)) > 0)
                 e[:, (i - 1) % convits] = E
@@ -1082,17 +1081,6 @@ class ClusteringFunc:
                     #replace matplotlib
                     matplotlib.use('Qt5Agg')
                     winc = clusterdisplay(tmp[tmpi], netsim[tmpi], None, None, 'apcluster', '# iterations', 'Fitness (net similarity) of quantized intermediate solution', None, None,0)
-                    winc.show()
-                    winc.exec()
-                    #plt.figure()
-
-                    #plt.plot(tmp[tmpi], netsim[tmpi], 'r--')
-                    #plt.xlabel('Number of iterations')
-                    #plt.ylabel('Fitness (net similarity) of quantized intermediate solution')
-                    #plt.show()
-                    #time.sleep(2)
-                    #plt.close()
-
             # identify exemplars
             I = np.nonzero(np.diag(A + R) > 0)[0]  # non-zero returns a tuple: (array of indices, type)
             K = max(I.shape)  # fixed len to matlab "Length"
@@ -1214,20 +1202,10 @@ class ClusteringFunc:
                 yCent = np.min(y) + (np.max(y) - np.min(y)) / 2
                 optText = f'Estimated Optimal Cluster -- {yp}'
 
-                #replace matplotlib
+                #matplotlib
                 matplotlib.use('Qt5Agg')
-                winc = clusterdisplay(x, y, xp, yp, 'getsetpreference', 'Preference',
+                winc = clusterdisplay(x, y, xp, yp, 'Cluster Estimation', 'Preference',
                                       '# Clusters', 'Optimal Cluster', [xCent, yCent, optText], 1)
-                winc.show()
-                winc.exec()
-                #plt.figure()
-                #plt.plot(x, y, '-r', label='# Clusters')
-                #plt.plot(xp, yp, 'bo', label='Optimal Cluster')
-                #plt.ylabel('Number of clusters')
-                #plt.xlabel('Preference')
-                #plt.text(xCent, yCent, optText)
-                #plt.legend()
-                #plt.show()
             return yp
         estimateNumClusters(X)
 # end ClusteringFunctions
