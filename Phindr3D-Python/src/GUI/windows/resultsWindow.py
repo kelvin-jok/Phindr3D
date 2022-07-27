@@ -11,9 +11,12 @@ import pandas as pd
 from .featurefilegroupingwindow import featurefilegroupingWindow
 from .helperclasses import MplCanvas
 from .plot_functions import *
-
-from ...Clustering.Clustering_Functions import ClusteringFunc
-
+#from Clustering import *
+#from ...Clustering.__init__ import *
+#try:
+#    from ...Clustering.Clustering_Functions import *
+#except ImportError:
+#    from src.Clustering.Clustering_Functions import *
 class resultsWindow(QDialog):
     def __init__(self, color):
         super(resultsWindow, self).__init__()
@@ -30,7 +33,7 @@ class resultsWindow(QDialog):
         selectclasses = classification.addAction("Select Classes")
         clustering = data.addMenu("Clustering")
         estimate = clustering.addAction("Estimate Clusters")
-        estimate.triggered.connect(lambda: ClusteringFunc.clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
+        estimate.triggered.connect(lambda: Clustering.clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
         setnumber = clustering.addAction("Set Number of Clusters")
         piemaps = clustering.addAction("Pie Maps")
         export = clustering.addAction("Export Cluster Results")

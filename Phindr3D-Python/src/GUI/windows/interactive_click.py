@@ -19,19 +19,7 @@ from .plot_functions import *
 from .colorchannelWindow import *
 
 #Callback will open image associated with data point. Note: in 3D plot pan is hold left-click swipe, zoom is hold right-click swipe
-#Matplotlib Figure
-'''
-class MplCanvas(FigureCanvasQTAgg):
 
-    def __init__(self, parent=None, width=5, height=5, dpi=100, projection="3d"):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        #col*100+row*
-        if projection=="3d":
-            self.axes = self.fig.add_subplot(1,1,1, projection=projection)
-        else:
-            self.axes = self.fig.add_subplot(1,1,1, projection=None)
-        super(MplCanvas, self).__init__(self.fig)
-'''
 #imported matplotlib toolbar. Only use desired functions.
 class NavigationToolbar(NavigationToolbar):
     NavigationToolbar.toolitems = (
