@@ -45,7 +45,7 @@ class colorchannelWindow(object):
         win.layout().addLayout(confirm_layout)
         #button callbacks
         btn_grp.buttonPressed.connect(self.colorpicker_window)
-        btn_ok.clicked.connect(lambda: self.confirmed_colors(win, color))
+        btn_ok.clicked.connect(lambda: self.confirmed_colors(win))
         btn_cancel.clicked.connect(lambda: win.close())
         #window size
         minsize = win.minimumSizeHint()

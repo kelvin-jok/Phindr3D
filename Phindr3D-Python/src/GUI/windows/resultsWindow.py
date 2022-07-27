@@ -11,9 +11,12 @@ import pandas as pd
 from .featurefilegroupingwindow import featurefilegroupingWindow
 from .helperclasses import MplCanvas
 from .plot_functions import *
-
-from ...Clustering.Clustering_Functions import ClusteringFunc
-
+#from Clustering import *
+#from ...Clustering.__init__ import *
+#try:
+#    from ...Clustering.Clustering_Functions import *
+#except ImportError:
+#    from src.Clustering.Clustering_Functions import *
 class resultsWindow(QDialog):
     def __init__(self, color):
         super(resultsWindow, self).__init__()
@@ -30,7 +33,7 @@ class resultsWindow(QDialog):
         selectclasses = classification.addAction("Select Classes")
         clustering = data.addMenu("Clustering")
         estimate = clustering.addAction("Estimate Clusters")
-        estimate.triggered.connect(lambda: ClusteringFunc.clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
+        estimate.triggered.connect(lambda: Clustering().clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
         setnumber = clustering.addAction("Set Number of Clusters")
         piemaps = clustering.addAction("Pie Maps")
         export = clustering.addAction("Export Cluster Results")
@@ -196,6 +199,7 @@ class resultsWindow(QDialog):
         maxd = np.max(image_feature_data[featurecols], axis=0)
         featuredf = (image_feature_data[featurecols] - mind) / (maxd - mind)
         mdatadf = image_feature_data[mdatacols]
+        featuredf.dropna(axis=0, thresh=int(0.2 * featuredf.shape[0]), inplace=True)
 
         # select data
         if datachoice.lower() == 'mv':
@@ -208,6 +212,7 @@ class resultsWindow(QDialog):
             X = featuredf[mv_cols].to_numpy().astype(np.float64)
             print('Invalid data set choice. Using Megavoxel frequencies.')
         print('Dataset shape:', X.shape)
+        np.savetxt('/home/kjok/phindr_matlab_numpy/dataPy.txt', X)
         self.filtered_data=X
         #reset imageIDs
         self.imageIDs.clear()
