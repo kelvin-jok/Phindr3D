@@ -11,7 +11,6 @@ import pandas as pd
 from .featurefilegroupingwindow import featurefilegroupingWindow
 from .helperclasses import MplCanvas
 from .plot_functions import *
-
 from ...Clustering.Clustering_Functions import ClusteringFunc
 
 class resultsWindow(QDialog):
