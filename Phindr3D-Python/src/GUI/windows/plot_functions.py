@@ -22,7 +22,12 @@ from .colorchannelWindow import *
 import matplotlib
 import matplotlib.pyplot as plt
 from math import ceil, floor
-from ... Clustering.Clustering_Functions import ClusteringFunc
+#from ...Clustering.Clustering_Functions import *
+#try:
+#    from ...Clustering.Clustering_Functions import *
+#except ImportError:
+#    from src.Clustering.Clustering_Functions import *
+from Clustering import *
 from textwrap import wrap, fill
 
 def merge_channels(data, rgb_img, ch_len, scroller_value, color, meta_loc, box):
@@ -53,7 +58,7 @@ def result_plot(self, X, projection, plot, new_plot):
     if new_plot:
         dim=int(projection[0])
         #send to clustering.py for PCA, Sammon, t-SNE analysis
-        title, xlabel, ylabel, P=ClusteringFunc.plot_type(X, dim, plot)
+        title, xlabel, ylabel, P=Clustering().plot_type(X, dim, plot)
         self.plot_data.clear()
         #save new x, y, z data
         self.plot_data.append(P[:,0])
