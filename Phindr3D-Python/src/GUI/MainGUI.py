@@ -334,12 +334,12 @@ class MainGUI(QWidget, external_windows):
                     if (new_color in self.color)==False:
                         self.color.append(new_color)
                         count=count - 1
-            elif self.ch_len<2 and len(color)>self.ch_len:
-                color=color[:-(len(color)-self.ch_len)]
+            elif self.ch_len<2 and len(self.color)>self.ch_len:
+                self.color=self.color[:-(len(self.color)-self.ch_len)]
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[id]).size
             rgb_img = np.empty((self.ch_len, rgb_img[1], rgb_img[0], 3))
-            self.rgb_img=merge_channels(data, rgb_img, self.ch_len, id, color, 0, False)
+            self.rgb_img=merge_channels(data, rgb_img, self.ch_len, id, self.color, 0, False)
             #plot combined channels
             img_plot.axes.clear()
             img_plot.axes.imshow(self.rgb_img)
