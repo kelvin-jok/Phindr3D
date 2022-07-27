@@ -11,8 +11,9 @@ import pandas as pd
 from .featurefilegroupingwindow import featurefilegroupingWindow
 from .helperclasses import MplCanvas
 from .plot_functions import *
+from sklearn.datasets import make_blobs
 
-from ...Clustering.Clustering_Functions import ClusteringFunc
+#test
 
 class resultsWindow(QDialog):
     def __init__(self, color):
@@ -22,6 +23,11 @@ class resultsWindow(QDialog):
         self.imageIDs=[]
         self.plots=[]
         self.filtered_data=0
+        self.numcluster=None
+        #TEST
+        centers = [[1, 1], [-1, -1], [1, -1]]
+        X, labels_true = make_blobs(n_samples=200, centers=centers, cluster_std=0.5, random_state=0)
+
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -30,9 +36,15 @@ class resultsWindow(QDialog):
         selectclasses = classification.addAction("Select Classes")
         clustering = data.addMenu("Clustering")
         estimate = clustering.addAction("Estimate Clusters")
-        estimate.triggered.connect(lambda: ClusteringFunc.clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
+        #estimate.triggered.connect(lambda: Clustering().clusterest(X) if len(self.plot_data) > 0 else None)
+        #TEST
+        estimate.triggered.connect(lambda: Clustering().clusterest(self.filtered_data) if len(self.plot_data)>0 else None)
         setnumber = clustering.addAction("Set Number of Clusters")
+        setnumber.triggered.connect(lambda: self.setnumcluster() if len(self.plot_data) > 0 else None)
         piemaps = clustering.addAction("Pie Maps")
+        piemaps.triggered.connect(
+        lambda: piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
+        #piemaps.triggered.connect(lambda: piechart(self.filtered_data, self.numcluster, self.labels) if len(self.plot_data) >0 else None)
         export = clustering.addAction("Export Cluster Results")
         plotproperties = menubar.addMenu("Plot Properties")
         rotation_enable = plotproperties.addAction("3D Rotation Enable")
@@ -82,13 +94,16 @@ class resultsWindow(QDialog):
         self.plot_data = []
         self.labels = []
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
-        sc_plot = self.main_plot.axes.scatter3D([], [], [], s=10, alpha=1, depthshade=False)  # , picker=True)
+        print(np.shape(X))
+        print(X[0][:])
+        print(X[1][:])
+        sc_plot = self.main_plot.axes.scatter3D(X[:,0], X[:,1], np.zeros(np.shape(X)[0]), s=10, alpha=1, depthshade=False)  # , picker=True)
         self.main_plot.axes.set_position([-0.25, -0.05, 1, 1])
         #self.main_plot.fig.canvas.setFocusPolicy(Qt.ClickFocus)
         #self.main_plot.fig.canvas.setFocus()
-        if not self.plot_data:
-            self.main_plot.axes.set_ylim(bottom=0)
-            self.main_plot.axes.set_xlim(left=0)
+        #if not self.plot_data:
+        #    self.main_plot.axes.set_ylim(bottom=0)
+        #    self.main_plot.axes.set_xlim(left=0)
         self.original_xlim = sc_plot.axes.get_xlim3d()
         self.original_ylim = sc_plot.axes.get_ylim3d()
         self.original_zlim = sc_plot.axes.get_zlim3d()
@@ -102,7 +117,7 @@ class resultsWindow(QDialog):
             if dim == "2d":
                 self.projection = dim
                 self.main_plot.axes.mouse_init()
-                self.main_plot.axes.view_init(azim=-90, elev=89)
+                self.main_plot.axes.view_init(azim=-90, elev=-90)
                 self.main_plot.axes.get_zaxis().line.set_linewidth(0)
                 self.main_plot.axes.tick_params(axis='z', labelsize=0)
                 self.main_plot.draw()
@@ -196,6 +211,7 @@ class resultsWindow(QDialog):
         maxd = np.max(image_feature_data[featurecols], axis=0)
         featuredf = (image_feature_data[featurecols] - mind) / (maxd - mind)
         mdatadf = image_feature_data[mdatacols]
+        featuredf.dropna(axis=0, thresh=int(0.2 * featuredf.shape[0]), inplace=True)
 
         # select data
         if datachoice.lower() == 'mv':
@@ -229,4 +245,7 @@ class resultsWindow(QDialog):
         alert.setText(errormessage)
         alert.setIcon(icon)
         return alert
+    def setnumcluster(self):
+        clustnum=setcluster(self.numcluster)
+        self.numcluster=clustnum.clust
 # end resultsWindow

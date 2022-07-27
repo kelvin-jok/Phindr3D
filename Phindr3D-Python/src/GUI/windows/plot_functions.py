@@ -22,7 +22,12 @@ from .colorchannelWindow import *
 import matplotlib
 import matplotlib.pyplot as plt
 from math import ceil, floor
-from ... Clustering.Clustering_Functions import ClusteringFunc
+#from ...Clustering.Clustering_Functions import *
+#try:
+#    from ...Clustering.Clustering_Functions import *
+#except ImportError:
+#    from src.Clustering.Clustering_Functions import *
+from Clustering import *
 from textwrap import wrap, fill
 
 def merge_channels(data, rgb_img, ch_len, scroller_value, color, meta_loc, box):
@@ -42,7 +47,7 @@ def merge_channels(data, rgb_img, ch_len, scroller_value, color, meta_loc, box):
     divisor = np.sum(rgb_img != 0, axis=0)
     tot = np.sum(rgb_img, axis=0)
     rgb_img = np.divide(tot, divisor, out=np.zeros_like(tot), where=divisor != 0)
-    max_rng = [np.max(rgb_img[:, :, i]) if np.max(rgb_img[:, :, i]) > 0 else 1 for i in range(ch_len)]
+    max_rng = [np.max(rgb_img[:, :, i]) if np.max(rgb_img[:, :, i]) > 0 else 1 for i in range(3)]
     rgb_img = np.divide(rgb_img, max_rng)
     return (rgb_img)
 
@@ -53,7 +58,7 @@ def result_plot(self, X, projection, plot, new_plot):
     if new_plot:
         dim=int(projection[0])
         #send to clustering.py for PCA, Sammon, t-SNE analysis
-        title, xlabel, ylabel, P=ClusteringFunc.plot_type(X, dim, plot)
+        title, xlabel, ylabel, P=Clustering().plot_type(X, dim, plot)
         self.plot_data.clear()
         #save new x, y, z data
         self.plot_data.append(P[:,0])
@@ -108,7 +113,7 @@ def reset_view(self):
     self.main_plot.axes.set_ylim3d(self.original_ylim)
     self.main_plot.axes.set_zlim3d(self.original_zlim)
     #xy-plane view
-    self.main_plot.axes.view_init(azim=-90, elev=89)
+    self.main_plot.axes.view_init(azim=-90, elev=-90)
     self.main_plot.draw()
 
 def legend_colors(self):
