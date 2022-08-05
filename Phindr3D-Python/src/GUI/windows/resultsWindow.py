@@ -8,12 +8,11 @@ from mpl_toolkits.mplot3d import proj3d
 from matplotlib import rcParams, cycler
 from .interactive_click import interactive_points
 import pandas as pd
-from .featurefilegroupingwindow import featurefilegroupingWindow
+from .featurefilegroupingwindow import *
 from .helperclasses import MplCanvas
 from .plot_functions import *
 from sklearn.datasets import make_blobs
-
-#test
+from ...Training import *
 
 class resultsWindow(QDialog):
     def __init__(self, color):
@@ -31,14 +30,15 @@ class resultsWindow(QDialog):
         data = menubar.addMenu("Data Analysis")
         classification = data.addMenu("Classification")
         selectclasses = classification.addAction("Select Classes")
+        selectclasses.triggered.connect(lambda: TrainingFunctions().selectclasses(np.array(self.filtered_data), np.array(self.labels)) if len(self.plot_data)>0 else None)
         clustering = data.addMenu("Clustering")
         estimate = clustering.addAction("Estimate Clusters")
-        estimate.triggered.connect(lambda: Clustering().cluster_est(self.filtered_data) if len(self.plot_data)>0 else None)
+        estimate.triggered.connect(lambda: Clustering.Clustering().cluster_est(self.filtered_data) if len(self.plot_data)>0 else None)
         setnumber = clustering.addAction("Set Number of Clusters")
         setnumber.triggered.connect(lambda: self.setnumcluster(colordropdown.currentText()) if len(self.plot_data) > 0 else None)
 
         piemaps = clustering.addAction("Pie Maps")
-        piemaps.triggered.connect(lambda: piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
+        piemaps.triggered.connect(lambda: Clustering.piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
         export = clustering.addAction("Export Cluster Results")
         plotproperties = menubar.addMenu("Plot Properties")
         rotation_enable = plotproperties.addAction("3D Rotation Enable")
@@ -161,7 +161,12 @@ class resultsWindow(QDialog):
         feature_data = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
         grouping.blockSignals(True)
         grps=[]
-        featurefilegroupingWindow(feature_data.columns, grps)
+        col_lbl=np.array([lbl if lbl.find("Channel_")>-1 else np.nan for lbl in feature_data.columns])
+        col_lbl=col_lbl[col_lbl!='nan']
+        chk_lbl=np.array([lbl if lbl.find("MV")==-1 else np.nan for lbl in feature_data.columns.drop(labels=col_lbl)])
+        chk_lbl=chk_lbl[chk_lbl!='nan']
+        selectWindow(chk_lbl, col_lbl, "Filter Feature File Groups and Channels", "Grouping", "Channels", grps)
+        #featurefilegroupingWindow(feature_data.columns, grps)
         grouping.clear()
         grouping.addItem("No Grouping")
         for col in grps:
@@ -237,6 +242,6 @@ class resultsWindow(QDialog):
         alert.setIcon(icon)
         return alert
     def setnumcluster(self, group):
-        clustnum=setcluster(self.numcluster, self.filtered_data, self.plot_data, np.array(self.labels), group)
+        clustnum=Clustering.setcluster(self.numcluster, self.filtered_data, self.plot_data, np.array(self.labels), group)
         self.numcluster=clustnum.clust
 # end resultsWindow
