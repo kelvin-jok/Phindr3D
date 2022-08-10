@@ -22,7 +22,7 @@ from sklearn.cluster import AffinityPropagation
 from scipy.spatial.distance import cdist
 import sklearn.metrics as met
 import numpy as np
-from src.GUI.windows.helperclasses import *
+from ..GUI.windows.helperclasses import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -172,6 +172,7 @@ class clusterdisplay(object):
         win.show()
         win.exec()
 
+'''
 class errorWindow(object):
     def __init__(self,win_title, text):
         alert = QMessageBox()
@@ -179,7 +180,7 @@ class errorWindow(object):
         alert.setText(text)
         alert.setIcon(QMessageBox.Critical)
         alert.exec_()
-
+'''
 class Clustering:
     def __init__(self):
         self.eps = np.finfo(np.float64).eps
@@ -213,7 +214,6 @@ class Clustering:
     https://github.com/DWALab/Phindr3D/tree/9b95aebbd2a62c41d3c87a36f1122a78a21019c8/Lib
     and
     https://github.com/SRI-RSST/Phindr3D-python/blob/ba588bc925ef72c72103738d17ea922d20771064/phindr_functions.py
-    No constructor. All parameters and methods are static.
     """
     @staticmethod
     def cmdscale(D):

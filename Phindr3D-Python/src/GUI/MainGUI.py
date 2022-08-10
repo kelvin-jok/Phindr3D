@@ -45,8 +45,8 @@ class MainGUI(QWidget, external_windows):
         self.img_ind=1
         #Default color values for image plot
         keys, values = zip(*mcolors.CSS4_COLORS.items())
-        self.color = [mcolors.to_rgb(values[keys.index('red')]), mcolors.to_rgb(values[keys.index('lime')]),
-                 mcolors.to_rgb(values[keys.index('blue')])]
+        values=[values[x] for x, y in enumerate(keys) if 'white' not in y]
+        self.color = [(0, 0.45, 0.74),(0.85, 0.33, 0.1), (0.93, 0.69, 0.13)]
         self.ch_len=1
         layout = QGridLayout()
         layout.setAlignment(Qt.AlignBottom)
@@ -100,13 +100,15 @@ class MainGUI(QWidget, external_windows):
                     adjustbar.setValue(0)
                     slicescrollbar.setValue(0)
                     imagenav.setText("1")
-                    self.img_display(slicescrollbar, img_plot, sv, mv, color, values, self.img_ind)
+                    self.bounds, self.thresh=self.metadata.computeImageParameters(False)
+                    #print(bounds)
+                    issue=self.img_display(slicescrollbar, img_plot, sv, mv, color, values, self.img_ind)
                     # If the file loaded correctly, proceed to calculating thresholds, scale factors, etc.
-                    self.metadata.computeImageParameters()
-                    # Update values of GUI widgets
 
-                    alert = self.buildErrorWindow("Metadata Extraction Completed.", QMessageBox.Information, "Notice")
-                    alert.exec()
+                    # Update values of GUI widgets
+                    if not issue:
+                        alert = self.buildErrorWindow("Metadata Extraction Completed.", QMessageBox.Information, "Notice")
+                        alert.exec()
                 except MissingChannelStackError:
                     errortext = "Metadata Extraction Failed: Channel/Stack/ImageID column(s) missing and/or invalid."
                     alert = self.buildErrorWindow(errortext, QMessageBox.Critical)
@@ -310,6 +312,7 @@ class MainGUI(QWidget, external_windows):
             #extract image details from metadata
             data = pd.read_csv(self.metadata.GetMetadataFilename(), sep="\t")
             self.ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
+
             #get image index of previous stack
             prev=data[data["ImageID"] == img_id-1]["Channel_1"]
             if prev.size>1:
@@ -330,15 +333,34 @@ class MainGUI(QWidget, external_windows):
                 count=self.ch_len-len(self.color)
                 while count>0:
                     new_color=mcolors.to_rgb(values[random.sample(range(0,len(values)-1), 1)[0]])
+                    print(new_color)
                     if (new_color in self.color)==False:
                         self.color.append(new_color)
                         count=count - 1
             elif self.ch_len<2 and len(self.color)>self.ch_len:
                 self.color=self.color[:-(len(self.color)-self.ch_len)]
+            #check if treatment column and treatmentnormspecified
+            treat=""
+            bound=self.bounds[:]
+            if self.metadata.intensityNormPerTreatment: #TEMPORARY replace with setvoxelparameter intensityNormPerTreatment after completed!!!
+                bound=treatment_bounds(self, data, self.bounds)
+                '''
+                try:
+                    treat=data['Treatment'].str.replace(r'\\', '/', regex=True).iloc[id]
+                    print(np.where(data['Treatment'].unique()==treat)[0], "treat")
+                    print(self.bounds)
+                    bound=[self.bounds[0][np.where(data['Treatment'].unique()==treat)[0]], self.bounds[1][np.where(data['Treatment'].unique()==treat)[0]]]
+                    print(bound)
+                except:
+                    win=self.buildErrorWindow("intensityNormPerTreatment was set but no Treatment Column was found in Metadata", QMessageBox.Critical)
+                    win.exec()
+                '''
+                if not bound:
+                    return(False)
             #initialize array as image size with # channels
             rgb_img = Image.open(data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[id]).size
             rgb_img = np.empty((self.ch_len, rgb_img[1], rgb_img[0], 3))
-            self.rgb_img=merge_channels(data, rgb_img, self.ch_len, id, self.color, 0, False)
+            self.rgb_img=merge_channels(data, rgb_img, self.ch_len, id, self.color, 0, False, bound, self.thresh)
             #plot combined channels
             img_plot.axes.clear()
             img_plot.axes.imshow(self.rgb_img)

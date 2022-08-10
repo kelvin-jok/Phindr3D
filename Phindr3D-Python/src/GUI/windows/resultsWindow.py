@@ -4,14 +4,11 @@ from PyQt5.QtCore import *
 import numpy as np
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
-from mpl_toolkits.mplot3d import proj3d
-from matplotlib import rcParams, cycler
 from .interactive_click import interactive_points
 import pandas as pd
-from .featurefilegroupingwindow import featurefilegroupingWindow
-from .helperclasses import MplCanvas
 from .plot_functions import *
 from sklearn.datasets import make_blobs
+from ...Training import *
 
 class resultsWindow(QDialog):
     def __init__(self, color):
@@ -22,7 +19,10 @@ class resultsWindow(QDialog):
         self.plots=[]
         self.filtered_data=0
         self.numcluster=None
-
+        self.metadata=Metadata()
+        self.bounds=0
+        self.color=color
+        #menu tabs
         menubar = QMenuBar()
         file = menubar.addMenu("File")
         inputfile = file.addAction("Input Feature File")
@@ -31,30 +31,20 @@ class resultsWindow(QDialog):
         selectclasses = classification.addAction("Select Classes")
         clustering = data.addMenu("Clustering")
         estimate = clustering.addAction("Estimate Clusters")
-        estimate.triggered.connect(lambda: Clustering.Clustering().cluster_est(self.filtered_data) if len(self.plot_data)>0 else None)
         setnumber = clustering.addAction("Set Number of Clusters")
-        setnumber.triggered.connect(lambda: self.setnumcluster(colordropdown.currentText()) if len(self.plot_data) > 0 else None)
-
         piemaps = clustering.addAction("Pie Maps")
-        piemaps.triggered.connect(lambda: Clustering.piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
         export = clustering.addAction("Export Cluster Results")
         plotproperties = menubar.addMenu("Plot Properties")
         rotation_enable = plotproperties.addAction("3D Rotation Enable")
-        rotation_enable.triggered.connect(lambda: self.main_plot.axes.mouse_init())
         rotation_disable = plotproperties.addAction("3D Rotation Disable")
-        rotation_disable.triggered.connect(lambda: self.main_plot.axes.disable_mouse_rotation())
-        reset_action = QAction("Reset Plot View", self)
-        reset_action.triggered.connect(lambda: reset_view(self))
-        resetview = plotproperties.addAction(reset_action)
-
-        # menu features go here
+        resetview = plotproperties.addAction("Reset Plot View")
 
         # defining widgets
         box = QGroupBox()
         boxlayout = QGridLayout()
         selectfile = QPushButton("Select Feature File")
-        prevdata = QPushButton("Import Previous Plot Data")
-        exportdata = QPushButton("Export Plot Data")
+        prevdata = QPushButton("Import Previous Plot Data + Select Feature File")
+        exportdata = QPushButton("Export Current Plot Data")
         cmap=QPushButton("Legend Colours")
         map_type = QComboBox()
         map_type.addItems(["PCA","t-SNE","Sammon"])
@@ -79,6 +69,13 @@ class resultsWindow(QDialog):
         box.setLayout(boxlayout)
         #menu actions activated
         inputfile.triggered.connect(lambda: self.loadFeaturefile(colordropdown, map_type.currentText(), True))
+        selectclasses.triggered.connect(lambda: TrainingFunctions().selectclasses(np.array(self.filtered_data), np.array(self.labels)) if len(self.plot_data)>0 else None)
+        estimate.triggered.connect(lambda: Clustering.Clustering().cluster_est(self.filtered_data) if len(self.plot_data) > 0 else None)
+        setnumber.triggered.connect(lambda: self.setnumcluster(colordropdown.currentText()) if len(self.plot_data) > 0 else None)
+        piemaps.triggered.connect(lambda: Clustering.piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
+        rotation_enable.triggered.connect(lambda: self.main_plot.axes.mouse_init())
+        rotation_disable.triggered.connect(lambda: self.main_plot.axes.disable_mouse_rotation())
+        resetview.triggered.connect(lambda: reset_view(self))
         exportdata.clicked.connect(lambda: save_file(self, map_type.currentText()))
         prevdata.clicked.connect(lambda: import_file(self, map_type, colordropdown, twod, threed))
         #setup Matplotlib
@@ -87,12 +84,7 @@ class resultsWindow(QDialog):
         self.labels = []
         self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="3d")
         sc_plot = self.main_plot.axes.scatter3D([], [], [], s=10, alpha=1, depthshade=False)  # , picker=True)
-        self.main_plot.axes.set_position([-0.25, -0.05, 1, 1])
-        #self.main_plot.fig.canvas.setFocusPolicy(Qt.ClickFocus)
-        #self.main_plot.fig.canvas.setFocus()
-        #if not self.plot_data:
-        #    self.main_plot.axes.set_ylim(bottom=0)
-        #    self.main_plot.axes.set_xlim(left=0)
+        self.main_plot.axes.set_position([-0.2, -0.05, 1, 1])
         self.original_xlim = sc_plot.axes.get_xlim3d()
         self.original_ylim = sc_plot.axes.get_ylim3d()
         self.original_zlim = sc_plot.axes.get_zlim3d()
@@ -126,8 +118,8 @@ class resultsWindow(QDialog):
         twod.toggled.connect(lambda: toggle_2d_3d(twod, threed, "2d", map_type.currentText()))
         threed.toggled.connect(lambda: toggle_2d_3d(threed, twod, "3d", map_type.currentText()))
         twod.setChecked(True)
-        picked_pt=interactive_points(self.main_plot, self.projection, self.plot_data, self.labels, self.feature_file, color, self.imageIDs)
-        self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
+        #picked_pt=interactive_points(self.main_plot, self.projection, self.plot_data, self.labels, self.feature_file, color, self.imageIDs, self.bounds if isinstance(self.bounds, list) else None)
+        #self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
         colordropdown.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, self.projection, map_type.currentText(),False) if self.feature_file and colordropdown.count() > 0 else None)
         map_type.currentIndexChanged.connect(lambda: self.data_filt(colordropdown, self.projection, map_type.currentText(),True) if self.feature_file and colordropdown.count() > 0 else None)
         # building layout
@@ -146,26 +138,43 @@ class resultsWindow(QDialog):
     def loadFeaturefile(self, grouping, plot, new_plot):
         filename, dump = QFileDialog.getOpenFileName(self, 'Open Feature File', '', 'Text files (*.txt)')
         if filename != '':
-            self.feature_file.clear()
-            self.feature_file.append(filename)
-            print(self.feature_file)
-            grouping=self.color_groupings(grouping)
-            self.data_filt(grouping, self.projection, plot, new_plot)
-        else:
-            load_featurefile_win = self.buildErrorWindow("Select Valid Feature File (.txt)", QMessageBox.Critical)
-            load_featurefile_win.exec()
+            try:
+                self.feature_file.clear()
+                self.feature_file.append(filename)
+                print(self.feature_file)
+                grouping, cancel=self.color_groupings(grouping)
+                if not cancel:
+                    self.data_filt(grouping, self.projection, plot, new_plot)
+            except:
+                if len(self.plot_data)==0:
+                    grouping.clear()
+                errorWindow("Feature File Error", "Check Validity of Feature File (.txt)", )
+            picked_pt = interactive_points(self.main_plot, self.projection, self.plot_data, self.labels,
+                                               self.feature_file, self.color, self.imageIDs,
+                                               self.bounds)
+            self.main_plot.fig.canvas.mpl_connect('pick_event', picked_pt)
 
     def color_groupings(self, grouping):
+        #read feature file
         feature_data = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
         grouping.blockSignals(True)
         grps=[]
-        featurefilegroupingWindow(feature_data.columns, grps)
-        grouping.clear()
-        grouping.addItem("No Grouping")
-        for col in grps:
-            grouping.addItem(col)
-        grouping.blockSignals(False)
-        return(grouping)
+        #Get Channels
+        col_lbl=np.array([lbl if lbl.find("Channel_")>-1 else np.nan for lbl in feature_data.columns])
+        col_lbl=col_lbl[col_lbl!='nan']
+        #get features
+        chk_lbl=np.array([lbl if lbl[:2].find("MV")==-1 else np.nan for lbl in feature_data.columns.drop(labels=col_lbl)])
+        chk_lbl=chk_lbl[chk_lbl!='nan']
+        #select features window
+        win=selectWindow(chk_lbl, col_lbl, "Filter Feature File Groups and Channels", "Grouping", "Channels", grps)
+        if not win.x_press:
+            #change colorby window
+            grouping.clear()
+            grouping.addItem("No Grouping")
+            for col in grps:
+                grouping.addItem(col)
+            grouping.blockSignals(False)
+        return(grouping, win.x_press)
     def data_filt(self, grouping, projection, plot, new_plot):
         filter_data= grouping.currentText()
         print(filter_data)
@@ -228,12 +237,28 @@ class resultsWindow(QDialog):
         num_images_kept = X.shape[0]
         print(f'\nNumber of images: {num_images_kept}\n')
         result_plot(self, X, projection, plot, new_plot)
-    def buildErrorWindow(self, errormessage, icon):
-        alert = QMessageBox()
-        alert.setWindowTitle("Error Dialog")
-        alert.setText(errormessage)
-        alert.setIcon(icon)
-        return alert
+        if not self.metadata.metadataLoadSuccess:
+            try:
+                print(image_feature_data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0])
+                self.metadata.loadMetadataFile(image_feature_data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0])
+                self.bounds=self.metadata.computeImageParameters(False)
+
+                #self.metadata.lowerbound, self.metadata.upperbound,self.metadata.intensityThreshold = self.metadata.computeImageParameters(False)
+                #lowerbound, upperbound, intensityThreshold = self.metadata.computeImageParameters(False)
+                #self.metadata.lowerbound=lowerbound
+                #self.metadata.upperbound=upperbound
+                #self.metadata.intensityThreshold=intensityThreshold
+
+            except MissingChannelStackError:
+                errortext = "Metadata Extraction Failed: Channel/Stack/ImageID column(s) missing and/or invalid."
+                errorWindow("Metadata Error", errortext)
+            except FileNotFoundError:
+                errortext = "Metadata Extraction Failed: Metadata file does not exist."
+                errorWindow("Metadata Error", errortext)
+            except Exception:
+                errortext = "Metadata Extraction Failed: Invalid Image type (must be grayscale)."
+                errorWindow("Metadata Error", errortext)
+
     def setnumcluster(self, group):
         clustnum=Clustering.setcluster(self.numcluster, self.filtered_data, self.plot_data, np.array(self.labels), group)
         self.numcluster=clustnum.clust
