@@ -102,3 +102,11 @@ class selectWindow(object):
                 groupings.append(checkbox.text())
         self.x_press=False
         win.close()
+class errorWindow(object):
+    def __init__(self, win_title, text):
+        alert = QMessageBox()
+        alert.setWindowTitle(win_title)
+        alert.setText(text)
+        alert.setIcon(QMessageBox.Critical)
+        alert.show()
+        alert.exec()
