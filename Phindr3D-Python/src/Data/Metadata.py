@@ -44,7 +44,7 @@ class Metadata:
     def __init__(self):
         """Metadata class constructor"""
         # Define user-controlled parameters and set default values
-        self.intensityNormPerTreatment = False
+        self.intensityNormPerTreatment = False #kel False original
         self.randTrainingPerTreatment = 1
 
         # Set default values for internally-accessed member variables
@@ -119,19 +119,19 @@ class Metadata:
         for i in range(numrows):
             row = []
             for channel in channels:
-                if os.path.exists(metadata.at[i, channel]) \
-                    and (metadata.at[i, channel].endswith(".tiff")
-                         or metadata.at[i, channel].endswith(".tif")):
-                    row.append(metadata.at[i, channel])
-                #if os.path.exists(metadata[channel].str.replace(r'\\', '/', regex=True)[i]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
-                #    row.append(metadata[channel].str.replace(r'\\', '/', regex=True)[i])
+                #if os.path.exists(metadata.at[i, channel]) \
+                #    and (metadata.at[i, channel].endswith(".tiff")
+                #         or metadata.at[i, channel].endswith(".tif")):
+                #    row.append(metadata.at[i, channel])
+                if os.path.exists(metadata[channel].str.replace(r'\\', '/', regex=True)[i]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
+                    row.append(metadata[channel].str.replace(r'\\', '/', regex=True)[i])
                 else:
                     raise MissingChannelStackError
             # add additional parameter columnlabels, except for channels, stack, metadatafile, and image id
             # these will be ordered at the end, for referencing purposes
             # order of a row of data: Channels, Other Parameters, Stack, MetadataFile, ImageID
             for col in metadata:
-                if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID':
+                if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID' or col =='bounds' or col=='intensity_thresholds':
                     continue
                 row.append(metadata.at[i, col])
             row.append(metadata.at[i, 'Stack'])
@@ -145,7 +145,7 @@ class Metadata:
         for chan in channels:
             columnlabels.append(chan)
         for col in metadata:
-            if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID':
+            if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID' or col =='bounds' or col=='intensity_thresholds':
                 continue
             columnlabels.append(col)
         columnlabels.append('Stack')
@@ -617,7 +617,7 @@ class Metadata:
         return outputThresholdValues
     # end getImageThresholdValues
 
-    def computeImageParameters(self):
+    def computeImageParameters(self, test):
         """Call after loading metadata. Calls functions that compute the scaling factors and thresholds.
             On success, fills the scaling factor and intensity member variables and returns True.
             If the metadata did not load successfully, returns False
@@ -630,11 +630,13 @@ class Metadata:
         theTrainingFields = self.getTrainingFields(PhindConfig.randTrainingFields)
         (self.lowerbound, self.upperbound) = self.getScalingFactorforImages(theTrainingFields)
         self.intensityThresholdValues = self.getImageThresholdValues(theTrainingFields)
-
         intensityThreshold = np.quantile(self.intensityThresholdValues,
             PhindConfig.intensityThresholdTuningFactor, axis=0)
         self.intensityThreshold = np.reshape(intensityThreshold, (1, self.GetNumChannels()))
-        return True
+        if test:
+            return True
+        else:
+            return [self.lowerbound, self.upperbound], self.intensityThreshold
     # end computeImageParameters
 
 # end class Metadata
@@ -659,7 +661,7 @@ if __name__ == '__main__':
 
         print("So, did it load? " + "Yes!" if test.metadataLoadSuccess else "No.")
         print("===")
-        print("Running computeImageParameters: " + "Successful" if test.computeImageParameters() else "Unsuccessful")
+        print("Running computeImageParameters: " + "Successful" if test.computeImageParameters(True) else "Unsuccessful")
         print("===")
         print('Calculated image parameter comparisons...')
         lowerequal = (test.lowerbound == np.array(expected['lowerbound'])).all()
@@ -669,7 +671,7 @@ if __name__ == '__main__':
         print(f'Intensity threshold expected result: {intequal}')
         print("===")
         test.intensityNormPerTreatment = True
-        print("Running computeImageParameters by treatment: " + "Successful" if test.computeImageParameters() else "Unsuccessful")
+        print("Running computeImageParameters by treatment: " + "Successful" if test.computeImageParameters(True) else "Unsuccessful")
         print("===")
         treatlowerequal = (test.lowerbound == np.array(expected['treatment_lowerbound'])).all()
         treatupperequal = (test.upperbound == np.array(expected['treatment_upperbound'])).all()

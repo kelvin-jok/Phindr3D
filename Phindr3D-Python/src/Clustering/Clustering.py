@@ -22,13 +22,13 @@ from sklearn.cluster import AffinityPropagation
 from scipy.spatial.distance import cdist
 import sklearn.metrics as met
 import numpy as np
-from src.GUI.windows.helperclasses import *
+from ..GUI.windows.helperclasses import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
-
+import pandas as pd
 
 #manually enter cluster number
 class setcluster(object):
@@ -79,7 +79,23 @@ class setcluster(object):
                 labelc3.setText('Adjusted mutual information: ' + str(met.normalized_mutual_info_score(treatlabels, idx)))
         else:
             errorWindow("Cluster Error", "Number of Clusters must be a positive value")
-
+#export clusters
+class export_cluster(object):
+    def __init__(self, plot_data, datafilt, numclusters, featurefile):
+        if numclusters!=None:
+            name = QFileDialog.getSaveFileName(None, 'Save File')[0]
+            if name:
+                clusters, count, idx = Clustering().computeClustering(datafilt, numclusters, np.array(list(zip(plot_data[0], plot_data[1]))))
+                cols = list(pd.read_csv(featurefile, nrows=1, sep='\t'))
+                cols=list(filter(lambda col: (col.find("Channel")==-1 and col[:2]!='MV'), cols))
+                data=pd.read_csv(featurefile, usecols = cols[:], sep='\t')
+                if 'Stack' in cols:
+                    metadata = pd.read_csv(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], usecols= ['Stack'], sep="\t",na_values='NaN')
+                    data['Stack']=metadata
+                data['Cluster Assignment'] = idx
+                data.to_csv(name, sep='\t', mode='w', index=False)
+        else:
+            errorWindow("Export Error", "Please 'Set Number of Clusters' before using Export Cluster Results")
 #show clusters and piechart percentage of labels
 class piechart(object):
     def __init__(self, plot_data, datafilt, numclusters, labels, colors):
@@ -172,6 +188,7 @@ class clusterdisplay(object):
         win.show()
         win.exec()
 
+'''
 class errorWindow(object):
     def __init__(self,win_title, text):
         alert = QMessageBox()
@@ -179,7 +196,7 @@ class errorWindow(object):
         alert.setText(text)
         alert.setIcon(QMessageBox.Critical)
         alert.exec_()
-
+'''
 class Clustering:
     def __init__(self):
         self.eps = np.finfo(np.float64).eps

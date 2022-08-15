@@ -261,18 +261,31 @@ class DataFunctions:
         spY = int((param.croppedY/ param.tileY))
         tmpX = int((param.croppedX/ param.tileX) + superVoxelXOffset)
         tmpY = int((param.croppedY/ param.tileY) + superVoxelYOffset)
+        print(param.croppedX, param.tileX)
+        print(param.tileX, param.croppedY)
+        print((param.croppedX*param.croppedY)/(param.tileX*param.tileX))
+        print(tmpX*tmpY/(param.megaVoxelTileY*param.megaVoxelTileX))
 
         if type == 'SV':
-            IM[range(0,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
-            IM[:, range(0,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
-            IM[range(1,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
-            IM[:, range(1,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
+            IM[range(0,IM.shape[0],int(IM.shape[0]/param.tileX*2)), :,:] = (0.7, 0.7, 0.7, 1.0)
+            IM[:, range(0,IM.shape[1], int(IM.shape[1]/param.tileY) ),:] = (0.7, 0.7, 0.7, 1.0)
+            IM[range(1,IM.shape[0],int(IM.shape[0]/param.tileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
+            IM[:, range(1,IM.shape[1], int(IM.shape[1]/param.tileY)),:] = (0.7, 0.7, 0.7, 1.0)
+            #IM[range(0,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
+            #IM[:, range(0,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
+            #IM[range(1,IM.shape[0],int(spX/param.megaVoxelTileX)), :,:] = (0.7, 0.7, 0.7, 1.0)
+            #IM[:, range(1,IM.shape[1], int(spY/param.megaVoxelTileY)),:] = (0.7, 0.7, 0.7, 1.0)
 
         else:
-            IM[range(0,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
-            IM[:, range(0,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
-            IM[range(1,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
-            IM[:, range(1,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
+            IM[range(0,IM.shape[0],int(IM.shape[0]/param.megaVoxelTileX*2)), :,:] = (1.0, 1.0, 1.0, 1.0)
+            IM[:, range(0,IM.shape[1],int(IM.shape[1]/param.megaVoxelTileY*2)),:] = (1.0, 1.0, 1.0, 1.0)
+            IM[range(1,IM.shape[0],int(IM.shape[0]/param.megaVoxelTileX*2)), :,:] = (1.0, 1.0, 1.0, 1.0)
+            IM[:, range(1,IM.shape[1],int(IM.shape[1]/param.megaVoxelTileY*2)),:] = (1.0, 1.0, 1.0, 1.0)
+
+            #IM[range(0,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
+            #IM[:, range(0,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
+            #IM[range(1,IM.shape[0],tmpX), :,:] = (1.0, 1.0, 1.0, 1.0)
+            #IM[:, range(1,IM.shape[1],tmpY),:] = (1.0, 1.0, 1.0, 1.0)
 
         return IM
     # end getImageWithSVMVOverlay
