@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 from math import ceil, floor
 from textwrap import wrap, fill
 from .helperclasses import *
+import json
 try:
     from ...Clustering import Clustering
     from ...Data.DataFunctions import *

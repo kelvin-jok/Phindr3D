@@ -52,7 +52,7 @@ class setcluster(object):
             clusterset.lineEdit().setCursorPosition(1)
         #Add widgets and callbacks
         win.layout().addRow(label, clusterset)
-        if group=="Treatment":
+        if group=="Treatment" and len(np.unique(labels))>1:
             labelc1=QLabel('Mutual information: N\A')
             labelc2=QLabel('Normalized mutual information: N\A')
             labelc3=QLabel('Adjusted mutual information: N\A')
@@ -60,7 +60,7 @@ class setcluster(object):
             win.layout().addRow(labelc2)
             win.layout().addRow(labelc3)
         win.layout().addRow(btn_ok, btn_close)
-        btn_ok.clicked.connect(lambda: self.confirmed_cluster(clusterset, datafilt, clusterset.value(), plot_data, labels, labelc1, labelc2, labelc3, group) if group=="Treatment" else self.confirmed_cluster(clusterset, datafilt, clusterset.value(), plot_data, labels, None, None, None, group))
+        btn_ok.clicked.connect(lambda: self.confirmed_cluster(clusterset, datafilt, clusterset.value(), plot_data, labels, labelc1, labelc2, labelc3, group) if group=="Treatment" and len(np.unique(labels))>1 else self.confirmed_cluster(clusterset, datafilt, clusterset.value(), plot_data, labels, None, None, None, group))
         btn_close.clicked.connect(lambda: win.close())
         win.show()
         win.setWindowFlags(win.windowFlags() | Qt.CustomizeWindowHint | Qt.WindowStaysOnTopHint)
@@ -69,7 +69,7 @@ class setcluster(object):
     def confirmed_cluster(self, num, datafilt, numclusters, plot_data, labels, labelc1, labelc2, labelc3, group):
         if num.value()>0:
             self.clust=num.value()
-            if group=="Treatment":
+            if group=="Treatment" and len(np.unique(labels))>1:
                 clusters, counts, idx =Clustering().computeClustering(datafilt, numclusters, np.array(list(zip(plot_data[0], plot_data[1]))))
                 treatlabels = np.zeros(labels.shape)
                 for i, t in enumerate(labels):
@@ -90,8 +90,13 @@ class export_cluster(object):
                 cols=list(filter(lambda col: (col.find("Channel")==-1 and col[:2]!='MV'), cols))
                 data=pd.read_csv(featurefile, usecols = cols[:], sep='\t')
                 if 'Stack' in cols:
-                    metadata = pd.read_csv(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], usecols= ['Stack'], sep="\t",na_values='NaN')
-                    data['Stack']=metadata
+                    stack=[]
+                    metadata = pd.read_csv(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], usecols= ['Stack', 'ImageID'], sep="\t",na_values='NaN')
+                    for ind in np.unique(metadata['ImageID'].to_numpy()):
+                        idstack=metadata['Stack'].loc[metadata['ImageID'] == ind]
+                        stack.append("".join((str(idstack.min()),'-', str(idstack.max()))))
+                    data.rename(columns={'Stack': 'Stacks'}, inplace = True)
+                    data['Stacks']=stack
                 data['Cluster Assignment'] = idx
                 data.to_csv(name, sep='\t', mode='w', index=False)
         else:
@@ -188,15 +193,6 @@ class clusterdisplay(object):
         win.show()
         win.exec()
 
-'''
-class errorWindow(object):
-    def __init__(self,win_title, text):
-        alert = QMessageBox()
-        alert.setWindowTitle(win_title)
-        alert.setText(text)
-        alert.setIcon(QMessageBox.Critical)
-        alert.exec_()
-'''
 class Clustering:
     def __init__(self):
         self.eps = np.finfo(np.float64).eps
