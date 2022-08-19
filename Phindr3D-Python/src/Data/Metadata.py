@@ -20,6 +20,7 @@ import pandas
 import os.path
 import imageio.v2 as io
 import imagecodecs
+from scipy.stats.mstats import mquantiles
 
 try:
     from .Image import *
@@ -33,16 +34,19 @@ try:
 except ImportError:
     from src.PhindConfig.PhindConfig import *
 
-# Initialize a random number generator
-Generator = np.random.default_rng()
 
 class Metadata:
     """This class handles groups of image files and the associated metadata.
        Static methods that draw closely from transliterations of the MATLAB functions
        can be found in the DataFunctions class."""
 
+
     def __init__(self):
         """Metadata class constructor"""
+        # Initialize a random number generator
+        # NOTE: 12345 is set as seed for testing purposes
+        self.Generator = np.random.default_rng(12345)
+
         # Define user-controlled parameters and set default values
         self.intensityNormPerTreatment = False
         self.randTrainingPerTreatment = 1
@@ -119,19 +123,19 @@ class Metadata:
         for i in range(numrows):
             row = []
             for channel in channels:
-                #if os.path.exists(metadata.at[i, channel]) \
-                #    and (metadata.at[i, channel].endswith(".tiff")
-                #         or metadata.at[i, channel].endswith(".tif")):
-                #    row.append(metadata.at[i, channel])
-                if os.path.exists(metadata[channel].str.replace(r'\\', '/', regex=True)[i]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
-                    row.append(metadata[channel].str.replace(r'\\', '/', regex=True)[i])
+                if os.path.exists(metadata.at[i, channel]) \
+                    and (metadata.at[i, channel].endswith(".tiff")
+                         or metadata.at[i, channel].endswith(".tif")):
+                    row.append(metadata.at[i, channel])
+                #if os.path.exists(metadata[channel].str.replace(r'\\', '/', regex=True)[i]) and (metadata.at[i, channel].endswith(".tiff") or metadata.at[i, channel].endswith(".tif")):
+                #    row.append(metadata[channel].str.replace(r'\\', '/', regex=True)[i])
                 else:
                     raise MissingChannelStackError
             # add additional parameter columnlabels, except for channels, stack, metadatafile, and image id
             # these will be ordered at the end, for referencing purposes
             # order of a row of data: Channels, Other Parameters, Stack, MetadataFile, ImageID
             for col in metadata:
-                if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID' or col =='bounds' or col=='intensity_thresholds':
+                if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID':
                     continue
                 row.append(metadata.at[i, col])
             row.append(metadata.at[i, 'Stack'])
@@ -145,7 +149,7 @@ class Metadata:
         for chan in channels:
             columnlabels.append(chan)
         for col in metadata:
-            if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID' or col =='bounds' or col=='intensity_thresholds':
+            if col.startswith('Channel_') or col == 'Stack' or col == 'MetadataFile' or col == 'ImageID':
                 continue
             columnlabels.append(col)
         columnlabels.append('Stack')
@@ -197,6 +201,9 @@ class Metadata:
             This method chooses the first from the list.
             This method creates a dictionary of imageIDs and the Treatment values,
             if they exist, or None if not. On error, returns an empty dictionary."""
+        """
+        dictionary: { key=imageID : value=treatment, ... }
+        """
         allTreatments = {}
         try:
             if len(self.images) > 0:
@@ -225,7 +232,10 @@ class Metadata:
             This method collects the treatment types, including multiple treatments
             in the same image, if this condition exists.
             This method returns a list of strings of all treatment types if they
-            exist, or an empty string if not. Returns an empty string on error. """
+            exist, or an empty list if not. Returns an empty list on error. """
+        """
+        list: [treatments found in the metadata]
+        """
         treatmentList = []
         try:
             if len(self.images) > 0:
@@ -297,7 +307,7 @@ class Metadata:
 
         if not self.intensityNormPerTreatment:
             randFieldID = np.array([uniqueImageID[i] for i in
-                Generator.choice(uniqueImageID.size, size=randTrainingFields,
+                self.Generator.choice(uniqueImageID.size, size=randTrainingFields,
                     replace=False, shuffle=False)])
         else:
             # have different treatments, want to choose training images from each treatment.
@@ -314,7 +324,7 @@ class Metadata:
                     treatmentIDs = allTrKeys[allTrValues == treat]
                     if len(treatmentIDs) > 0:
                         tempList = [treatmentIDs[j] for j in
-                            Generator.choice(len(treatmentIDs), size=randTrainingPerTreatment,
+                            self.Generator.choice(len(treatmentIDs), size=randTrainingPerTreatment,
                                 replace=False, shuffle=False)]
                 except (ValueError,KeyError):
                     tempList = []
@@ -356,7 +366,7 @@ class Metadata:
             zStackKeys = list(zStack.keys())
             randHalf = int(depth // 2)
             # choose half of the stack, randomly
-            generatedArray = Generator.choice(depth, size=randHalf, replace=False, shuffle=False)
+            generatedArray = self.Generator.choice(depth, size=randHalf, replace=False, shuffle=False)
             # TO DO Add try-catch here for KeyError
             randZ = [zStackKeys[int(j)] for j in generatedArray]
             minVal = np.zeros((randHalf, numChannels))
@@ -371,8 +381,8 @@ class Metadata:
                     imFilePath = theChannels[channelKeys[k]].channelpath
                     # TO DO Add try-catch here for IOError (or similar - check imread api)
                     IM = io.imread(imFilePath)
-                    minVal[j, k] = np.quantile(IM, 0.01)
-                    maxVal[j, k] = np.quantile(IM, 0.99)
+                    minVal[j, k] = mquantiles(IM, 0.01, alphap=0.5, betap=0.5)
+                    maxVal[j, k] = mquantiles(IM, 0.99, alphap=0.5, betap=0.5)
             minChannel[i, :] = np.amin(minVal, axis=0)
             maxChannel[i, :] = np.amax(maxVal, axis=0)
 
@@ -392,18 +402,18 @@ class Metadata:
             for i in range(0, uGrp.size):
                 ii = grpVal == uGrp[i]
                 if np.sum(ii) > 1:
-                    lowerbound[i, :] = np.quantile(minChannel[grpVal == uGrp[i], :], 0.01)
-                    upperbound[i, :] = np.quantile(maxChannel[grpVal == uGrp[i], :], 0.99)
+                    lowerbound[i, :] = mquantiles(minChannel[grpVal == uGrp[i], :], 0.01, alphap=0.5, betap=0.5)
+                    upperbound[i, :] = mquantiles(maxChannel[grpVal == uGrp[i], :], 0.99, alphap=0.5, betap=0.5)
                 else:
                     lowerbound[i, :] = minChannel[grpVal == uGrp[i], :]
                     upperbound[i, :] = maxChannel[grpVal == uGrp[i], :]
         else:
-            lowerbound = np.quantile(minChannel, 0.01, axis=0)
-            upperbound = np.quantile(maxChannel, 0.99, axis=0)
+            lowerbound = mquantiles(minChannel, 0.01, alphap=0.5, betap=0.5, axis=0).ravel()
+            upperbound = mquantiles(maxChannel, 0.99, alphap=0.5, betap=0.5, axis=0).ravel()
         return (lowerbound, upperbound)
     # end getScalingFactorforImages
 
-    def getImageInformation(self, theImage):
+    def getImageInformation(self, theImage, chan=0):
         """Get information about the image files.
             Called in getPixelBinCenters, getImageThresholdValues,
             extractImageLevelTextureFeatures"""
@@ -418,8 +428,8 @@ class Metadata:
             # dictionaries are ordered as of Python 3.7,
             # but we will not assume what version of Python 3 is being used
             firstStack = theImage.stackLayers[list(theImage.stackLayers.keys())[0]]
-            firstChannel = firstStack.channels[list(firstStack.channels.keys())[0]]
-            imFileName = firstChannel.channelpath
+            theChannel = firstStack.channels[list(firstStack.channels.keys())[chan]]
+            imFileName = theChannel.channelpath
             # imfinfo is matlab built-in,
             # so replicate its action in DataFunctions
             info = DataFunctions.imfinfo(imFileName)
@@ -539,26 +549,26 @@ class Metadata:
         return tileInfo
     # end getTileInfo
 
-    def getIndividualChannelThreshold(self, theImage, theTileInfo):
+    def getIndividualChannelThreshold(self, imageObject, theTileInfo):
         """individual channel threshold"""
         numChannels = self.GetNumChannels()
         allTreatmentTypes = self.GetTreatmentTypes()
-        errorVal = np.zeros((len(theImage.stackLayers), numChannels))
-        thresh = np.zeros((len(theImage.stackLayers), numChannels))
+        errorVal = np.zeros((len(imageObject.stackLayers), numChannels))
+        thresh = np.zeros((len(imageObject.stackLayers), numChannels))
 
         if self.intensityNormPerTreatment:
             # index of the treatment for this image in the list of all treatments
             # if the treatment type is not found (or there are no treatments), return error
             try:
-                grpVal = allTreatmentTypes.index(theImage.GetTreatment()[0])
+                grpVal = allTreatmentTypes.index(imageObject.GetTreatment()[0])
             except (ValueError, IndexError):
                 return errorVal
         # end if
-        for iImages in range(len(theImage.stackLayers)):
+        for iImages in range(len(imageObject.stackLayers)):
             for iChannels in range(numChannels):
                 try:
-                    stackIndex = list(theImage.stackLayers.keys())[iImages]
-                    theStack = theImage.stackLayers[stackIndex]
+                    stackIndex = list(imageObject.stackLayers.keys())[iImages]
+                    theStack = imageObject.stackLayers[stackIndex]
                     channelIndex = list(theStack.channels.keys())[iChannels]
                     theChannel = theStack.channels[channelIndex]
                     imFileName = theChannel.channelpath
@@ -617,7 +627,7 @@ class Metadata:
         return outputThresholdValues
     # end getImageThresholdValues
 
-    def computeImageParameters(self, test):
+    def computeImageParameters(self):
         """Call after loading metadata. Calls functions that compute the scaling factors and thresholds.
             On success, fills the scaling factor and intensity member variables and returns True.
             If the metadata did not load successfully, returns False
@@ -627,13 +637,13 @@ class Metadata:
             return False
         # else
         # TO DO: catch errors, return False if caught
-        theTrainingFields = self.getTrainingFields(PhindConfig.randTrainingFields)
-        (self.lowerbound, self.upperbound) = self.getScalingFactorforImages(theTrainingFields)
-        self.intensityThresholdValues = self.getImageThresholdValues(theTrainingFields)
-        if test:
-            return True
-        else:
-            return [self.lowerbound, self.upperbound], self.intensityThresholdValues
+        self.trainingSet = self.getTrainingFields(PhindConfig.randTrainingFields)
+        (self.lowerbound, self.upperbound) = self.getScalingFactorforImages(self.trainingSet)
+        self.intensityThresholdValues = self.getImageThresholdValues(self.trainingSet)
+        intensityThreshold = mquantiles(self.intensityThresholdValues, PhindConfig.intensityThresholdTuningFactor, alphap=0.5, betap=0.5, axis=0)
+        self.intensityThreshold = np.reshape(intensityThreshold, (1, self.GetNumChannels()))
+        return True
+
     # end computeImageParameters
 
 # end class Metadata
@@ -658,7 +668,7 @@ if __name__ == '__main__':
 
         print("So, did it load? " + "Yes!" if test.metadataLoadSuccess else "No.")
         print("===")
-        print("Running computeImageParameters: " + "Successful" if test.computeImageParameters(True) else "Unsuccessful")
+        print("Running computeImageParameters: " + "Successful" if test.computeImageParameters() else "Unsuccessful")
         print("===")
         print('Calculated image parameter comparisons...')
         lowerequal = (test.lowerbound == np.array(expected['lowerbound'])).all()
@@ -668,7 +678,7 @@ if __name__ == '__main__':
         print(f'Intensity threshold expected result: {intequal}')
         print("===")
         test.intensityNormPerTreatment = True
-        print("Running computeImageParameters by treatment: " + "Successful" if test.computeImageParameters(True) else "Unsuccessful")
+        print("Running computeImageParameters by treatment: " + "Successful" if test.computeImageParameters() else "Unsuccessful")
         print("===")
         treatlowerequal = (test.lowerbound == np.array(expected['treatment_lowerbound'])).all()
         treatupperequal = (test.upperbound == np.array(expected['treatment_upperbound'])).all()

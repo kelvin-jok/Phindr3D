@@ -31,6 +31,15 @@ from .windows.plot_functions import *
 from .windows.helperclasses import *
 from ..PhindConfig.PhindConfig import TileInfo
 
+from scipy.spatial import distance as dist
+try:
+    from ..VoxelGroups.VoxelGroups import *
+    from ..Clustering.Clustering import *
+    from ..Training.Training import *
+except ImportError:
+    from src.VoxelGroups.VoxelGroups import *
+    from src.Clustering.Clustering import *
+    from src.Training.Training import *
 
 class MainGUI(QWidget, external_windows):
     """Defines the main GUI window of Phindr3D"""
@@ -39,7 +48,10 @@ class MainGUI(QWidget, external_windows):
         """MainGUI constructor"""
         QMainWindow.__init__(self)
         super(MainGUI, self).__init__()
+        self.training = Training()
         self.metadata = Metadata()
+        self.voxelGroups = VoxelGroups(self.metadata)
+        # self.clustering = Clustering() #dont need this, clustering occurs in the view results parts and the clustering object isnt relevant.
         self.setWindowTitle("Phindr3D")
         self.image_grid=0
         self.rgb_img=0
@@ -84,6 +96,8 @@ class MainGUI(QWidget, external_windows):
                 errortext = "Image Out of Range"
                 alert = self.buildErrorWindow(errortext, QMessageBox.Critical)
                 alert.exec()
+            elif buttonPressed == "Phind":
+                self.phindButtonAction()
 
         def exportError():
             if not self.metadata.GetMetadataFilename():
@@ -102,8 +116,11 @@ class MainGUI(QWidget, external_windows):
                     slicescrollbar.blockSignals(True)
                     threshbar.setValue(0)
                     slicescrollbar.setValue(0)
+                    self.img_ind=1
                     imagenav.setText("1")
-                    self.bounds, self.thresh=self.metadata.computeImageParameters(False)
+                    self.metadata.computeImageParameters()
+                    self.thresh=self.metadata.intensityThresholdValues
+                    self.bounds=[self.metadata.lowerbound, self.metadata.upperbound]
                     threshbar.setValue(int(PhindConfig().intensityThresholdTuningFactor*100))
                     threshbar.blockSignals(False)
                     slicescrollbar.blockSignals(False)
@@ -124,6 +141,9 @@ class MainGUI(QWidget, external_windows):
                     errortext = "Metadata Extraction Failed: Invalid Image type (must be grayscale)."
                     alert = self.buildErrorWindow(errortext, QMessageBox.Critical)
                     alert.exec()
+                except Exception as e:
+                    print(e)
+                    return
             else:
                 load_metadata_win = self.buildErrorWindow("Select Valid Metadatafile (.txt)", QMessageBox.Critical)
                 load_metadata_win.show()
@@ -194,7 +214,18 @@ class MainGUI(QWidget, external_windows):
 
         # Function purely for testing purposes, this function will switch 'foundMetadata' to true or false
         def testMetadata():
-            slicescrollbar.setMaximum(5)
+            pixels = PixelImage()
+            superVoxels = SuperVoxelImage()
+            megaVoxels = MegaVoxelImage()
+            try:
+                pixels.getPixelBinCenters(self.metadata, self.training)
+                print(pixels.pixelBinCenters)
+                superVoxels.getSuperVoxelBinCenters(self.metadata, self.training, pixels)
+                print(superVoxels.superVoxelBinCenters)
+                megaVoxels.getMegaVoxelBinCenters(self.metadata, self.training, pixels, superVoxels)
+                print(megaVoxels.megaVoxelBinCenters)
+            except Exception as e:
+                print(e)
 
         createmetadata.triggered.connect(extractMetadata)
         viewresults.triggered.connect(viewResults)
@@ -364,12 +395,35 @@ class MainGUI(QWidget, external_windows):
                 data.insert(loc=int(np.where(data.columns == 'ImageID')[0]), column='intensity_thresholds', value=np.repeat([mquantiles(self.thresh, 0, alphap=0.5, betap=0.5, axis=0)], data.shape[0], axis=0).tolist())
             else:
                 data['bounds']= np.repeat([self.bounds], data.shape[0], axis=0).tolist()
-                data['intensity_thresholds']= np.repeat([self.thresh], data.shape[0], axis=0).tolist()
+                data['intensity_thresholds']= np.repeat([mquantiles(self.thresh, 0, alphap=0.5, betap=0.5, axis=0)], data.shape[0], axis=0).tolist()
             data.to_csv(data['MetadataFile'].str.replace(r'\\', '/', regex=True).iloc[0], sep='\t', index=False)
             #sv/mv overlay removed when new image
             sv.setChecked(False)
             mv.setChecked(False)
         return(False)
+    # end img_display
+
+    def phindButtonAction(self):
+        """Actions performed when the Phind button is pressed and metadata has been loaded"""
+        if self.metadata.GetMetadataFilename():
+            #get output dir:
+            savefile, dump = QFileDialog.getSaveFileName(self, 'Phindr3D Results', '', 'Text file (*.txt)')
+            self.metadata.computeImageParameters()
+            self.training.randFieldID = self.metadata.trainingSet
+
+            if len(savefile) > 0:
+                if self.voxelGroups.action(savefile, self.training):
+                    message = f'All Done!\n\nResults saved at:\n{savefile}'
+                    alert = self.buildErrorWindow(message, QMessageBox.Information, "Notice")
+                    alert.exec()
+                else:
+                    # error
+                    print('something went wrong.')
+                    print("voxel grouping failed")
+        else:
+            # do nothing? display error window?
+            pass
+    # end phindButtonAction
 
     def buildErrorWindow(self, errormessage, icon, errortitle="ErrorDialog"):
         alert = QMessageBox()

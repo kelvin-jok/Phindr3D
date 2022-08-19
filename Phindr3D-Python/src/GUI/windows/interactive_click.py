@@ -14,6 +14,7 @@ from more_itertools import locate
 from .plot_functions import *
 from .colorchannelWindow import *
 import PIL.Image
+import json
 
 #Callback will open image associated with data point. Note: in 3D plot pan is hold left-click swipe, zoom is hold right-click swipe (zoom disabled)
 class interactive_points():
@@ -106,7 +107,7 @@ class interactive_points():
         if feature_file:
             # extract image details from feature file
             data = pd.read_csv(feature_file[0], sep="\t", na_values='NaN')
-            ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
+
             try:
                 metadata=Metadata()
                 metadata.loadMetadataFile(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0])
@@ -121,9 +122,8 @@ class interactive_points():
                 errorWindow("Metadata Error", errortext)
 
             #getting metadatafile
-            cols= ['ImageID', 'image_bounds', 'intensity_thresholds'].extend(["Channel_"+str(ch) for ch in range(1,ch_len+1)])
-            data = pd.read_csv(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], sep="\t", usecols=cols, na_values='NaN')
-
+            data = pd.read_csv(data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], sep="\t", na_values='NaN')
+            ch_len = (list(np.char.find(list(data.columns), 'Channel_')).count(0))
             # update channel labels
             ch_names = ['<font color= "#' + str('%02x%02x%02x' % (
             int(color[i - 1][0] * 255), int(color[i - 1][1] * 255), int(color[i - 1][2] * 255)))
@@ -147,7 +147,7 @@ class interactive_points():
                     break
             file_info.setText("Filename: " + data['Channel_1'].str.replace(r'\\', '/', regex=True).iloc[meta_loc + slicescrollbar.value()] + '\n\n Projection Type: ' + pjt_label)
             # lower/upperbounds, threshold for images
-            bounds = json.loads(data['image_bounds'].iloc[0])
+            bounds = json.loads(data['bounds'].iloc[0])
             threshold = json.loads(data['intensity_thresholds'].iloc[0])
             if len(np.shape(bounds))>2:
                 bounds = treatment_bounds(self, data, bounds, meta_loc)

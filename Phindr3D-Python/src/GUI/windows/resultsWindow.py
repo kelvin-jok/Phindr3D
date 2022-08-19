@@ -157,13 +157,19 @@ class resultsWindow(QDialog):
         grouping.blockSignals(True)
         grps=[]
         #Get Channels
-        col_lbl=np.array([lbl if lbl.find("Channel_")>-1 else np.nan for lbl in feature_data.columns])
+        meta_col=pd.read_csv(feature_data["MetadataFile"].str.replace(r'\\', '/', regex=True).iloc[0], nrows=1,  sep="\t", na_values='NaN').columns.tolist()
+        col_lbl=np.array([lbl if lbl.find("Channel_")>-1 else np.nan for lbl in meta_col])
         col_lbl=col_lbl[col_lbl!='nan']
-        #get features
-        chk_lbl=np.array([lbl if lbl[:2].find("MV")==-1 else np.nan for lbl in feature_data.columns.drop(labels=col_lbl)])
+        #Get MV and Texturefeatures labels
+        self.filt=[]
+        filt_lbl=np.array(["MV"])
+        if max(feature_data.columns.str.contains("text_", case=False)):
+            filt_lbl=np.concatenate((filt_lbl, ["Texture_Features"]))
+        #get labels
+        chk_lbl=np.array([lbl if lbl[:2].find("MV")==-1 and lbl!='bounds' and lbl!='intensity_thresholds' and lbl[:5]!='text_' else np.nan for lbl in feature_data.columns])
         chk_lbl=chk_lbl[chk_lbl!='nan']
         #select features window
-        win=selectWindow(chk_lbl, col_lbl, "Filter Feature File Groups and Channels", "Grouping", "Channels", grps)
+        win=selectWindow(chk_lbl, col_lbl, "Filter Feature File Groups and Channels", "Grouping", "Channels", grps, filt_lbl, self.filt)
         if not win.x_press:
             #change colorby window
             grouping.clear()
@@ -175,12 +181,12 @@ class resultsWindow(QDialog):
     def data_filt(self, grouping, projection, plot, new_plot):
         filter_data= grouping.currentText()
 
-        # choose dataset to use for clustering: EDIT HERE
+        # choose dataset to use for clustering
         # Choices:
         # 'MV' -> megavoxel frequencies,
-        # 'text' -> 4 haralick texture features,
-        # 'combined' -> both together
-        datachoice = 'MV'
+        # 'Texture_Features' -> 4 haralick texture features,
+        # 'Combined' -> both together
+
         image_feature_data = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
 
         # Identify columns
@@ -206,11 +212,13 @@ class resultsWindow(QDialog):
         featuredf.dropna(axis=0, inplace=True)  # thresh=int(0.2 * featuredf.shape[0]) )
 
         # select data
-        if datachoice.lower() == 'mv':
-            X = featuredf[mv_cols].to_numpy().astype(np.float64)
-        elif datachoice.lower() == 'text':
-            X = featuredf[texture_cols].to_numpy().astype(np.float64)
-        elif datachoice.lower() == 'combined':
+        if len(self.filt)==1:
+            if self.filt[0] == 'MV':
+                X = featuredf[mv_cols].to_numpy().astype(np.float64)
+                grouping.remove()
+            elif self.filt[0] == 'Texture_Features':
+                X = featuredf[texture_cols].to_numpy().astype(np.float64)
+        elif self.filt == ['MV','Texture_Features']:
             X = featuredf.to_numpy().astype(np.float64)
         else:
             X = featuredf[mv_cols].to_numpy().astype(np.float64)
