@@ -143,7 +143,6 @@ class piechart(object):
                     self.main_plot.axes.scatter(plot_data[0][cluster], plot_data[1][cluster], marker=mark, s=s1 ** 2 *4000*rsize[size_ind], facecolor=colors[parts_ind[0][x]])
                 self.main_plot.axes.text(plot_data[0][cluster], plot_data[1][cluster], s=size_ind, horizontalalignment='center', verticalalignment='center', bbox=dict(facecolor='white', alpha=0.7))
             self.main_plot.axes.set_aspect('equal')
-            self.main_plot.axes.invert_yaxis()
             self.main_plot.fig.tight_layout()
             self.main_plot.axes.axis('off')
             self.main_plot.draw()

@@ -237,7 +237,7 @@ class MainGUI(QWidget, external_windows):
         expparameters.triggered.connect(exportError)
         about.triggered.connect(self.aboutAlert)
         segmentation.triggered.connect(organoidSegmentation)
-        loadmetadata.triggered.connect(lambda: loadMetadata(self, sv, mv, threshbar, slicescrollbar, img_plot, self.color, values))
+        loadmetadata.triggered.connect(lambda: loadMetadata(self, sv, mv, threshbar, slicescrollbar, img_plot, self.color, values, imagenav))
         menuexit.triggered.connect(self.close)
 
         switchmeta.triggered.connect(testMetadata)
@@ -392,7 +392,7 @@ class MainGUI(QWidget, external_windows):
             self.image_grid=np.full((self.rgb_img.shape[0], self.rgb_img.shape[1], 4), (0.0,0.0,0.0,0.0))
             #add thresholds/bounds to metadatafile
             data.drop(data.filter(regex="Unname"),axis=1, inplace=True)
-            if 'image_bounds' not in data.columns and 'intensity_thresholds' not in data.columns:
+            if 'bounds' not in data.columns and 'intensity_thresholds' not in data.columns:
                 data.insert(loc=int(np.where(data.columns == 'ImageID')[0]), column='bounds', value=np.repeat([self.bounds], data.shape[0], axis=0).tolist())
                 data.insert(loc=int(np.where(data.columns == 'ImageID')[0]), column='intensity_thresholds', value=np.repeat([mquantiles(self.thresh, 0, alphap=0.5, betap=0.5, axis=0)], data.shape[0], axis=0).tolist())
             else:
