@@ -115,6 +115,8 @@ class MainGUI(QWidget, external_windows):
                         # after updating parameters, what needs to be done?
                         self.voxelGroups.updateImages()
                         self.metadata.computeImageParameters()
+                        self.thresh = self.metadata.intensityThresholdValues
+                        self.bounds = [self.metadata.lowerbound, self.metadata.upperbound]
                         self.img_display(slicescrollbar, img_plot, sv, mv, values, self.img_ind, imgwindow)
                 except Exception as e:
                     print(e)
