@@ -115,6 +115,11 @@ class MainGUI(QWidget, external_windows):
                         # after updating parameters, what needs to be done?
                         self.voxelGroups.updateImages()
                         self.metadata.computeImageParameters()
+                        self.thresh = self.metadata.intensityThresholdValues
+                        self.bounds = [self.metadata.lowerbound, self.metadata.upperbound]
+                        threshbar.blockSignals(True)
+                        threshbar.setValue(int(PhindConfig().intensityThresholdTuningFactor * 100))
+                        threshbar.blockSignals(False)
                         self.img_display(slicescrollbar, img_plot, sv, mv, values, self.img_ind, imgwindow)
                 except Exception as e:
                     print(e)
@@ -197,7 +202,7 @@ class MainGUI(QWidget, external_windows):
                 win_color=colorchannelWindow(self.ch_len, self.color, "Color Channel Picker", "Channels", ['Channel_' + str(i) for i in range(1,self.ch_len+1)])
                 self.color=win_color.color
                 if np.array_equal(prev_color, self.color)==False:
-                    self.img_display(slicescrollbar, img_plot, sv, mv, values, self.img_ind, imgwindow)
+                    self.img_display(slicescrollbar, img_plot, sv, mv, values, self.img_ind, imgwindow, threshbar.value()/100)
 
         # Declaring menu actions, to be placed in their proper section of the menubar
         menubar = QMenuBar()
@@ -375,7 +380,6 @@ class MainGUI(QWidget, external_windows):
                 cmap=[[0,0,0,0],[255,255,255,1]]
                 cmap = matplotlib.colors.LinearSegmentedColormap.from_list('map_white', cmap)
                 img_plot.axes.imshow(overlay, zorder=5, cmap=cmap, interpolation=None)
-
             img_plot.draw()
     #draw superimposed image channels
     def img_display(self, slicescrollbar, img_plot, sv, mv, values, img_id, imgwindow, prob=PhindConfig().intensityThresholdTuningFactor):
