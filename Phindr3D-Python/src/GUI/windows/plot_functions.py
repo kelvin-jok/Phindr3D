@@ -1,18 +1,18 @@
 # Copyright (C) 2022 Sunnybrook Research Institute
-# This file is part of src <https://github.com/DWALab/Phindr3D>.
+# This file is part of Phindr3D <https://github.com/DWALab/Phindr3D>.
 #
-# src is free software: you can redistribute it and/or modify
+# Phindr3D is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# src is distributed in the hope that it will be useful,
+# Phindr3D is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with src.  If not, see <http://www.gnu.org/licenses/>.
+# along with Phindr3D.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 from cv2 import medianBlur
@@ -158,6 +158,7 @@ def save_file(self, map):
                 'x_limit': self.original_xlim,
                 'y_limit': self.original_ylim,
                 'z_limit': self.original_zlim,
+                'feature_filename': self.feature_file[0]
         }
         with open(name+'.json', 'w') as f:
             json.dump(info, f)
@@ -169,7 +170,7 @@ def import_file(self, map_dropdown, colordropdown, twod, threed):
         with open(filename, "r") as f:
             try:
                 data=json.load(f)
-                if list(data.keys())==['plot_projection','plot_coordinates','x_limit','y_limit','z_limit']:
+                if list(data.keys())==['plot_projection','plot_coordinates','x_limit','y_limit','z_limit', 'feature_filename']:
                     self.plot_data.clear()
                     self.plot_data.extend([np.array(plot_data) for plot_data in data.get('plot_coordinates')])
                     self.original_xlim = data.get('x_limit')
@@ -182,6 +183,6 @@ def import_file(self, map_dropdown, colordropdown, twod, threed):
                     threed.setChecked(True)
                 else:
                     twod.setChecked(True)
-                self.loadFeaturefile(colordropdown, map_dropdown.currentText(), False)
+                self.loadFeaturefile(colordropdown, map_dropdown.currentText(), False, data.get('feature_filename'))
             except:
-                errorWindow("Import Plot Data Error", "Check if correct file. Requires Following Labels: plot_projection, plot_coordinates, x_limit , y_limit ,z_limit")
+                errorWindow("Import Plot Data Error", "Check if correct file. Requires Following Labels: plot_projection, plot_coordinates, x_limit , y_limit ,z_limit, 'feature_filename'")

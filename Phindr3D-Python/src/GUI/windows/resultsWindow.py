@@ -1,18 +1,18 @@
 # Copyright (C) 2022 Sunnybrook Research Institute
-# This file is part of src <https://github.com/DWALab/Phindr3D>.
+# This file is part of Phindr3D <https://github.com/DWALab/Phindr3D>.
 #
-# src is free software: you can redistribute it and/or modify
+# Phindr3D is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# src is distributed in the hope that it will be useful,
+# Phindr3D is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with src.  If not, see <http://www.gnu.org/licenses/>.
+# along with Phindr3D.  If not, see <http://www.gnu.org/licenses/>.
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -89,15 +89,15 @@ class resultsWindow(QDialog):
         box.setLayout(boxlayout)
         #menu actions activated
         inputfile.triggered.connect(lambda: self.loadFeaturefile(colordropdown, map_type.currentText(), True))
-        selectclasses.triggered.connect(lambda: TrainingFunctions().selectclasses(np.array(self.filtered_data), np.array(self.labels)) if len(self.plot_data)>0 else None)
-        estimate.triggered.connect(lambda: Clustering.Clustering().cluster_est(self.filtered_data) if len(self.plot_data) > 0 else None)
-        setnumber.triggered.connect(lambda: self.setnumcluster(colordropdown.currentText()) if len(self.plot_data) > 0 else None)
-        piemaps.triggered.connect(lambda: Clustering.piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else None)
-        export.triggered.connect(lambda: Clustering.export_cluster(self.plot_data, self.filtered_data, self.numcluster, self.feature_file[0]) if len(self.plot_data) >0 else None)
+        selectclasses.triggered.connect(lambda: TrainingFunctions().selectclasses(np.array(self.filtered_data), np.array(self.labels)) if len(self.plot_data)>0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
+        estimate.triggered.connect(lambda: Clustering.Clustering().cluster_est(self.filtered_data) if len(self.plot_data) > 0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
+        setnumber.triggered.connect(lambda: self.setnumcluster(colordropdown.currentText()) if len(self.plot_data) > 0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
+        piemaps.triggered.connect(lambda: Clustering.piechart(self.plot_data, self.filtered_data, self.numcluster, np.array(self.labels), [np.array(plot.get_facecolor()[0][0:3]) for plot in self.plots]) if len(self.plot_data) > 0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
+        export.triggered.connect(lambda: Clustering.export_cluster(self.plot_data, self.filtered_data, self.numcluster, self.feature_file[0]) if len(self.plot_data) >0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
         rotation_enable.triggered.connect(lambda: self.main_plot.axes.mouse_init())
         rotation_disable.triggered.connect(lambda: self.main_plot.axes.disable_mouse_rotation())
         resetview.triggered.connect(lambda: reset_view(self))
-        exportdata.clicked.connect(lambda: save_file(self, map_type.currentText()))
+        exportdata.clicked.connect(lambda: save_file(self, map_type.currentText()) if len(self.plot_data) else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
         prevdata.clicked.connect(lambda: import_file(self, map_type, colordropdown, twod, threed))
         #setup Matplotlib
         matplotlib.use('Qt5Agg')
@@ -135,7 +135,7 @@ class resultsWindow(QDialog):
 
         # button features and callbacks
         selectfile.clicked.connect(lambda: self.loadFeaturefile(colordropdown, map_type.currentText(), True))
-        cmap.clicked.connect(lambda: legend_colors(self) if len(self.labels)>0 else None)
+        cmap.clicked.connect(lambda: legend_colors(self) if len(self.labels)>0 else errorWindow("Error Dialog","Please Select Feature File. No data is currently displayed"))
         twod.toggled.connect(lambda: toggle_2d_3d(twod, threed, "2d", map_type.currentText()))
         threed.toggled.connect(lambda: toggle_2d_3d(threed, twod, "3d", map_type.currentText()))
         twod.setChecked(True)
@@ -156,20 +156,23 @@ class resultsWindow(QDialog):
         minsize.setWidth(self.minimumSizeHint().width() + 700)
         self.setFixedSize(minsize)
 
-    def loadFeaturefile(self, grouping, plot, new_plot):
+    def loadFeaturefile(self, grouping, plot, new_plot, prevfile=None):
         filename, dump = QFileDialog.getOpenFileName(self, 'Open Feature File', '', 'Text files (*.txt)')
-        if filename != '':
-            try:
-                self.feature_file.clear()
-                self.feature_file.append(filename)
-                print(self.feature_file)
-                grouping, cancel=self.color_groupings(grouping)
-                if not cancel:
-                    self.data_filt(grouping, self.projection, plot, new_plot)
-            except Exception as ex:
-                if len(self.plot_data)==0:
-                    grouping.clear()
-                errorWindow("Feature File Error", "Check Validity of Feature File (.txt). \nPython Exception Error: {}".format(ex))
+        if isinstance(prevfile, str) and prevfile !=filename:
+            errorWindow("Feature File Error","Incorrect Feature File Path/Location (.txt). \n Selected Feature File Path: \n'{}' \n\n Expected Feature File Path: \n'{}'".format(filename, prevfile))
+        else:
+            if filename != '':
+                try:
+                    self.feature_file.clear()
+                    self.feature_file.append(filename)
+                    print(self.feature_file)
+                    grouping, cancel=self.color_groupings(grouping)
+                    if not cancel:
+                        self.data_filt(grouping, self.projection, plot, new_plot)
+                except Exception as ex:
+                    if len(self.plot_data)==0:
+                        grouping.clear()
+                    errorWindow("Feature File Error", "Check Validity of Feature File (.txt). \nPython Exception Error: {}".format(ex))
 
 
     def color_groupings(self, grouping):
@@ -210,7 +213,10 @@ class resultsWindow(QDialog):
         # 'Combined' -> both together
 
         image_feature_data = pd.read_csv(self.feature_file[0], sep='\t', na_values='        NaN')
-
+        if new_plot==False:
+            print(self.labels)
+            if self.labels in image_feature_data.values==False:
+                print("False")
         # Identify columns
         columns = image_feature_data.columns
         mv_cols = columns[columns.map(lambda col: col.startswith('MV'))]
@@ -255,6 +261,7 @@ class resultsWindow(QDialog):
             z = np.ones(X.shape[0]).astype(int)
             if filter_data != "No Grouping":
                 z = np.array(mdatadf[filter_data], dtype='object')
+
             self.labels.clear()
             self.labels.extend(list(map(str, z)))
             # misc info

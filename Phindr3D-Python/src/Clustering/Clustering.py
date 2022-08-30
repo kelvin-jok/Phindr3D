@@ -1,18 +1,18 @@
 # Copyright (C) 2022 Sunnybrook Research Institute
-# This file is part of src <https://github.com/DWALab/Phindr3D>.
+# This file is part of Phindr3D <https://github.com/DWALab/Phindr3D>.
 #
-# src is free software: you can redistribute it and/or modify
+# Phindr3D is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# src is distributed in the hope that it will be useful,
+# Phindr3D is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with src.  If not, see <http://www.gnu.org/licenses/>.
+# along with Phindr3D.  If not, see <http://www.gnu.org/licenses/>.
 
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA, KernelPCA
@@ -38,8 +38,7 @@ class setcluster(object):
         win = QDialog()
         win.setWindowTitle("Set Number of Clusters")
         win.setLayout(QFormLayout())
-
-        label=QLabel("Enter number of clusters")
+        label=QLabel("Enter number of clusters to try. \nNote: Final cluster total after analysis may be different")
         clusterset=QSpinBox()
         btn_ok=QPushButton("OK")
         btn_close=QPushButton("Close")
@@ -128,6 +127,7 @@ class piechart(object):
             #clusters and centers
             clusters, count, idx=Clustering().computeClustering(datafilt, numclusters, np.array(list(zip(plot_data[0], plot_data[1]))))
             groups=np.unique(labels)
+            self.max_piesize = 3000  # maximum matplotlib piechart size.
             self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="2d")
             #plot cluster centers and connect line to data points
             for i in np.unique(idx):
@@ -143,7 +143,8 @@ class piechart(object):
             if min(rsize) != max(rsize):
                 rsize = (np.array(rsize) - min(rsize))/ (max(rsize) - min(rsize));
                 rsize = (maxRadius - minRadius) * rsize + minRadius;
-
+            else:
+                rsize=np.ones(len(count))
             cluster_percent=[np.array([np.count_nonzero(labels[np.where(idx == i)[0].astype(int)]==trt)/np.count_nonzero(idx==i) for trt in groups]) for i in clusters]
             #pie divisions (derived from https://matplotlib.org/stable/gallery/lines_bars_and_markers/scatter_piecharts.html)
             def pie_slice(prev_ratio, cur_ratio):
@@ -158,7 +159,7 @@ class piechart(object):
                 parts=np.array(pt[parts_ind[0].astype(int)])
                 for x in range(len(parts)):
                     s1, mark=pie_slice(sum(parts[:x]), sum(parts[:x+1]))
-                    self.main_plot.axes.scatter(plot_data[0][cluster], plot_data[1][cluster], marker=mark, s=s1 ** 2 *3000*rsize[size_ind], facecolor=colors[parts_ind[0][x]])
+                    self.main_plot.axes.scatter(plot_data[0][cluster], plot_data[1][cluster], marker=mark, s=s1 ** 2 *self.max_piesize*rsize[size_ind], facecolor=colors[parts_ind[0][x]])
                 self.main_plot.axes.text(plot_data[0][cluster], plot_data[1][cluster], s=size_ind+1, horizontalalignment='center', verticalalignment='center', bbox=dict(facecolor='white', alpha=0.7))
             self.main_plot.axes.set_aspect('equal')
             self.main_plot.fig.tight_layout()
