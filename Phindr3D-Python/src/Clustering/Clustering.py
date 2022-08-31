@@ -127,7 +127,7 @@ class piechart(object):
             #clusters and centers
             clusters, count, idx=Clustering().computeClustering(datafilt, numclusters, np.array(list(zip(plot_data[0], plot_data[1]))))
             groups=np.unique(labels)
-            self.max_piesize=3000 # maximum matplotlib piechart size.
+            self.max_piesize=3000  # maximum matplotlib piechart size.
             self.main_plot = MplCanvas(self, width=10, height=10, dpi=100, projection="2d")
             #plot cluster centers and connect line to data points
             for i in np.unique(idx):
