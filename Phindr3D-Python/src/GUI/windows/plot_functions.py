@@ -33,11 +33,11 @@ except ImportError:
     from src.Clustering import Clustering
     from src.Data.DataFunctions import *
 
-def treatment_bounds(self, data, bounds, id):
+def treatment_bounds(data, bounds, id, treatmentcol):
 
     try:
-        trt = data[self.metadata.treatmentColNameForNormalization].iloc[id]
-        trt_loc =int(np.where(data[self.metadata.treatmentColNameForNormalization].unique() == trt)[0])
+        trt = data[treatmentcol].iloc[id]
+        trt_loc =int(np.where(data[treatmentcol].unique() == trt)[0])
 
         bound = [bounds[0][trt_loc], bounds[1][trt_loc]]
         return(bound)
@@ -182,13 +182,9 @@ def import_file(self, map_dropdown, colordropdown, twod, threed):
                         map_dropdown.blockSignals(False)
                         #2d/3d set
                         if np.all(self.plot_data[2]) != 0:
-                            threed.blockSignals(True)
                             threed.setChecked(True)
-                            threed.blockSignals(False)
                         else:
-                            twod.blockSignals(True)
                             twod.setChecked(True)
-                            twod.blockSignals(False)
                         self.loadFeaturefile(colordropdown, map_dropdown.currentText(), False, data.get('feature_filename'))
                 else:
                     errorWindow("Import Plot Data Error", "Check if correct file. Requires Following Labels: plot_projection, plot_coordinates, x_limit , y_limit ,z_limit, 'feature_filename'")
