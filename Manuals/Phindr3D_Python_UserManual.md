@@ -11,7 +11,7 @@
 
 Phindr3D requires a metadata file to properly load 3D multichannel images.  
 
-- Clicking on Metadata > Create Metafile opens a new window for creating metadata.
+- Clicking on Metadata > Create Metadatafile opens a new window for creating metadata.
 <br>
 <p align="center">
 <img src="Images/Creating-metadata.png" height="350"></img></p>
@@ -155,6 +155,14 @@ Train by Condition
 <p align="center">
 <img src="Images/set-parameters.png" width="250"></img></p>
 <br>
+
+#### <ins>Export/Import Session</ins>
+To export the current session, go to the menu tab File >> Export >> Session
+(session data saved as a .pickle file)
+
+To import previous session, go to the menu tab File >> Import >> Entire Session. Then select the .pickle file
+
+To import previous settings, go to the menu tab File >> Import >> Parameters from Session. Then select the .pickle file. Note: This option may only be used if the associated metadata file is already loaded. If used on a different dataset, may give errors.
 
 #### <ins>Results Window</ins>
 
