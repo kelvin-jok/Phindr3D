@@ -90,19 +90,63 @@ class MainGUI(QWidget, external_windows):
             filename = QFileDialog.getOpenFileName(self, 'Open Exported Pickle File', '', 'Pickle file (*.pickle)')[0]
             if filename != '':
                 #retrieve and set imported data
-                curfile=self.metadata.GetMetadataFilename()
                 with open(filename, 'rb') as f:
-                    self.metadata = pickle.load(f)
-                    self.metapandas = pd.DataFrame.from_dict(pickle.load(f), orient='index').T #metadata file as pandas dataframe
+                    session = pickle.load(f)
+                    session_pd = pd.DataFrame.from_dict(pickle.load(f), orient='index').T #metadata file as pandas dataframe
                     data= pickle.load(f)
-                    if not param:
+                    if not param: #imports the session
+                        self.metadata = session
+                        self.metapandas = session_pd
                         self.color = data.get('color')
                         self.ch_len= data.get('ch_len')
-                    else:
-                        self.metadata.SetMetadataFilename(curfile)# retain current metadatafile name if only parameters
-                        del self.metapandas
-                    self.bounds = data.get('bounds')[0]
-                    self.thresh = data.get('threshold')[0]
+                        self.bounds = data.get('bounds')[0]
+                        self.thresh = data.get('threshold')[0]
+                    else: #imports the parameters
+                        self.metadata.countBackground=session.countBackground
+                        self.metadata.theTileInfo=session.theTileInfo
+                        metaheader = list(pd.read_csv(self.metadata.GetMetadataFilename(), nrows=1, sep='\t'))
+                        recalculate=False
+                        # check if treatmentCol empty
+                        if session.intensityNormPerTreatment==False:
+                            if self.metadata.intensityNormPerTreatment: #if False both not using treatmentCol
+                                self.metadata.intensityNormPerTreatment=False
+                                self.metadata.treatmentColNameForNormalization=''
+                                recalculate=True
+                        #treatment selected check compatibility
+                        elif session.treatmentColNameForNormalization in metaheader: #if False not compatible, original unchanged
+                            self.metadata.intensityNormPerTreatment=True
+                            self.metadata.treatmentColNameForNormalization=session.treatmentColNameForNormalization
+                            #check size compatibility
+                            metacol = pd.read_csv(self.metadata.GetMetadataFilename(), sep='\t', usecols=[session.treatmentColNameForNormalization])
+                            if (metacol[session.treatmentColNameForNormalization].nunique(),self.ch_len) == np.shape(data.get('bounds')[0])[1:]:
+                                self.bounds = data.get('bounds')[0]
+                                self.thresh = data.get('threshold')[0]
+                            else:
+                                recalculate=True
+                        #check if trainingCol empty
+                        if session.trainbycondition==False:
+                            if self.metadata.trainbycondition: #if False both not using trainingCol
+                                self.metadata.trainbycondition=False
+                                self.metadata.trainingColforImageCategories=''
+                                if not self.metadata.intensityNormPerTreatment and not session.intensityNormPerTreatment: #priority to intensitynormpertreatment
+                                    recalculate=True
+                        #trainingcol selected check compatibility
+                        elif session.trainingColforImageCategories in metaheader:
+                            self.metadata.trainbycondition=True
+                            self.metadata.trainingColforImageCategories=session.trainingColforImageCategories
+                            if session.trainbycondition and not session.intensityNormPerTreatment and not self.metadata.intensityNormPerTreatment: #priority to intensitynormpertreatment
+                                #check if same channel length
+                                if data.get('ch_len')==self.ch_len:
+                                    self.bounds = data.get('bounds')[0]
+                                    self.thresh = data.get('threshold')[0]
+                                else:
+                                    recalculate=True
+                        if recalculate: #True if shape incompatible, but column names compatible
+                            self.metadata.computeImageParameters()
+                            self.thresh = self.metadata.intensityThresholdValues
+                            self.bounds = [self.metadata.lowerbound, self.metadata.upperbound]
+                            msg=self.buildErrorWindow("Recalculating based on imported parameters...", QMessageBox.Information, "Import Parameters")
+                            msg.exec()
                     self.voxelGroups = VoxelGroups(self.metadata)
                     self.voxelGroups.numVoxelBins = data.get('numVoxelBins')
                     self.voxelGroups.numMegaVoxelBins = data.get('numMegaVoxelBins')
@@ -550,7 +594,6 @@ class MainGUI(QWidget, external_windows):
         alert.exec()
 
     def closeEvent(self, event):
-        #print("closed all windows")
         for window in QApplication.topLevelWidgets():
             window.close()
 
