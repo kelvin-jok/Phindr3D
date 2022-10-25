@@ -83,14 +83,15 @@ def result_plot(self, X, projection, plot, new_plot):
         else:
             self.plot_data.append(np.zeros(len(self.plot_data[-1])))
     #plot data
-    colors= plt.cm.get_cmap('gist_ncar')(range(0, 255, floor(255/len(np.unique(self.labels)))))
+    colors= plt.cm.get_cmap('gist_rainbow')
+    colors= [list(colors(i)) for i in np.linspace(0, 1, len(np.unique(self.labels)), endpoint=True)]
     if len(np.unique(self.labels))>1:
         for label, i in zip(np.unique(self.labels), range(len(np.unique(self.labels)))):
             self.plots.append(self.main_plot.axes.scatter3D(self.plot_data[0][np.where(np.array(self.labels)==label)[0]], self.plot_data[1][np.where(np.array(self.labels)==label)[0]], self.plot_data[2][np.where(np.array(self.labels)==label)[0]], label=label,
-                            s=10, alpha=1, color=[colors[i]], depthshade=False, picker=1.5, cmap=colors))
+                            s=10, alpha=1, color=[colors[i]], depthshade=False, picker=1.5))
     else:
         self.plots.append(self.main_plot.axes.scatter3D(self.plot_data[0], self.plot_data[1], self.plot_data[2], label=self.labels[0],
-                        s=10, alpha=1, color=[colors[0]], depthshade=False, picker=2, cmap=colors))
+                        s=10, alpha=1, color=[colors[0]], depthshade=False, picker=2))
     legend_format(self, plot, colors, new_plot)
 
 def legend_format(self, plot, colors, new_plot):
@@ -108,9 +109,11 @@ def legend_format(self, plot, colors, new_plot):
     #textwrap if longer than 10 characters
     if len(text)>10:
         labels = [fill(lbl, 20) for lbl in np.unique(self.labels)]
-        self.main_plot.axes.legend(handle, labels, bbox_to_anchor=bbox, ncol=cols,loc='center right')
+        plt_legend=self.main_plot.axes.legend(handle, labels, bbox_to_anchor=bbox, ncol=cols,loc='center right')
     else:
-        self.main_plot.axes.legend(handle, np.unique(self.labels),bbox_to_anchor=bbox, ncol=cols, loc='center right')
+        plt_legend=self.main_plot.axes.legend(handle, np.unique(self.labels),bbox_to_anchor=bbox, ncol=cols, loc='center right')
+    if plt_legend:
+        plt_legend.set_draggable(True)
     #axis/title labels
     self.main_plot.axes.set_title(plot + " Plot")
     self.main_plot.axes.set_xlabel(plot + " 1")

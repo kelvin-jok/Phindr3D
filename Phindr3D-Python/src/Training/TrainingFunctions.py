@@ -51,10 +51,10 @@ class TrainingFunctions:
         class_table = pd.crosstab(index=test_classes,columns=labels)
         class_table.index.name = None
         return(class_table)
-    def selectclasses(self, mv, lbls):
+    def selectcontrols(self, mv, lbls):
         select_grps=[]
         if len(np.unique(lbls))>1:
-            win=selectWindow(np.unique(lbls), "", "Select Classes", "Classes", "", select_grps)
+            win=selectWindow(np.unique(lbls), "", "Select Controls", "Controls", "", select_grps)
             if win.x_press:
                 pass #print("Cancelled")
             elif len(select_grps)>1:
@@ -69,11 +69,11 @@ class TrainingFunctions:
                 else:
                     grp_check=np.array(select_grps)
                     grp_check=grp_check[np.where(np.array(pts) < 2)[0]]
-                    errorWindow("Select Classes", "There are classes with less than 2 data points. Classes with less than 2 data points '{}'".format(grp_check))
+                    errorWindow("Select Classes", "There are controls with less than 2 data points. Controls with less than 2 data points '{}'".format(grp_check))
             else:
                 errorWindow("Select Classes", "Must select at least two classes. Selected Class '{}'".format(select_grps))
         else:
-            errorWindow("Select Classes", "Must have at least two classes. Choose 'Color by' option that has more than 1 class label. Only has one class label {}".format(np.unique(lbls)))
+            errorWindow("Select Classes", "Must have at least two Controls. Choose 'Color by' option that has more than 1 control. Only has one control {}".format(np.unique(lbls)))
 
 
 

@@ -97,7 +97,7 @@ class selectWindow(object):
         #size window to fit all elements
         minsize = win.minimumSizeHint()
         minsize.setHeight(win.minimumSizeHint().height() + 100)
-        minsize.setWidth(win.minimumSizeHint().width() + 100)
+        minsize.setWidth(win.minimumSizeHint().width() + 200)
         win.setFixedSize(minsize)
         win.show()
         win.setWindowFlags(win.windowFlags() | Qt.CustomizeWindowHint | Qt.WindowStaysOnTopHint)
